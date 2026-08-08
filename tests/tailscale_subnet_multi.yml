@@ -1,0 +1,155 @@
+---
+
+- name: Testing Multiple Tailscale Subnets
+  hosts: localhost
+  gather_facts: no
+  module_defaults:
+    group/oxlorg.opnsense.all:
+      firewall: "{{ lookup('ansible.builtin.env', 'TEST_FIREWALL') }}"
+      api_credential_file: "{{ lookup('ansible.builtin.env', 'TEST_API_KEY') }}"
+      ssl_verify: false
+
+    oxlorg.opnsense.list:
+      target: 'tailscale_subnet'
+
+    oxlorg.opnsense.tailscale_subnet_multi:
+      match_fields: ['subnet']
+      multi_control:
+        fail_verify: true
+        fail_process: true
+
+  environment:
+    HTTPS_PROXY: "{{ lookup('ansible.builtin.env', 'TEST_PROXY') | default('') }}"
+
+  tasks:
+    - name: Removing - do not exist
+      oxlorg.opnsense.tailscale_subnet_multi:
+        subnets:
+          - subnet: '192.168.71.0/24'
+          - subnet: '192.168.72.0/24'
+          - subnet: '192.168.73.0/24'
+        multi_control:
+          state: 'absent'
+      register: opn1
+      failed_when: >
+        opn1.failed or
+        opn1.changed
+
+    - name: Adding - failing because the netmask is missing
+      oxlorg.opnsense.tailscale_subnet_multi:
+        subnets:
+          - subnet: '192.168.71.1'
+      register: opn_fail1
+      failed_when: not opn_fail1.failed
+
+    - name: Adding - failing because the host-bits are set
+      oxlorg.opnsense.tailscale_subnet_multi:
+        subnets:
+          - subnet: '192.168.71.1/24'
+      register: opn_fail2
+      failed_when: not opn_fail2.failed
+
+    - name: Adding
+      oxlorg.opnsense.tailscale_subnet_multi:
+        subnets:
+          - subnet: '192.168.71.0/24'
+            description: 'ANSIBLE_TEST_1_1'
+          - subnet: '192.168.72.0/24'
+            description: 'ANSIBLE_TEST_1_2'
+          - subnet: 'fd00:71::/64'
+            description: 'ANSIBLE_TEST_1_3'
+      register: opn2
+      failed_when: >
+        opn2.failed or
+        not opn2.changed
+
+    - name: Adding - nothing should change
+      oxlorg.opnsense.tailscale_subnet_multi:
+        subnets:
+          - subnet: '192.168.71.0/24'
+            description: 'ANSIBLE_TEST_1_1'
+          - subnet: '192.168.72.0/24'
+            description: 'ANSIBLE_TEST_1_2'
+          - subnet: 'fd00:71::/64'
+            description: 'ANSIBLE_TEST_1_3'
+      register: opn3
+      failed_when: >
+        opn3.failed or
+        opn3.changed
+
+    - name: Changing the descriptions
+      oxlorg.opnsense.tailscale_subnet_multi:
+        subnets:
+          - subnet: '192.168.71.0/24'
+            description: 'ANSIBLE_TEST_1_1_CHANGED'
+          - subnet: '192.168.72.0/24'
+            description: 'ANSIBLE_TEST_1_2_CHANGED'
+          - subnet: 'fd00:71::/64'
+            description: 'ANSIBLE_TEST_1_3'
+      register: opn4
+      failed_when: >
+        opn4.failed or
+        not opn4.changed
+
+    - name: Adding using the short aliases
+      oxlorg.opnsense.tailscale_subnet_multi:
+        routes:
+          - {net: '192.168.73.0/24', desc: 'ANSIBLE_TEST_1_4'}
+      register: opn5
+      failed_when: >
+        opn5.failed or
+        not opn5.changed
+
+    - name: Listing
+      oxlorg.opnsense.list:
+      register: opn6
+      failed_when: >
+        'data' not in opn6 or
+        opn6.data | length < 4
+
+    - name: Purging the ones not configured
+      oxlorg.opnsense.tailscale_subnet_multi:
+        subnets:
+          - subnet: '192.168.71.0/24'
+            description: 'ANSIBLE_TEST_1_1_CHANGED'
+          - subnet: '192.168.72.0/24'
+            description: 'ANSIBLE_TEST_1_2_CHANGED'
+        multi_control:
+          purge_unconfigured: true
+          purge_filter:
+            description: 'ANSIBLE_TEST_1_'
+          purge_filter_partial: true
+      register: opn7
+      failed_when: >
+        opn7.failed or
+        not opn7.changed
+
+    - name: Purging the rest
+      oxlorg.opnsense.tailscale_subnet_multi:
+        subnets_purge:
+          - subnet: '192.168.71.0/24'
+          - subnet: '192.168.72.0/24'
+      register: opn8
+      failed_when: >
+        opn8.failed or
+        not opn8.changed
+
+    - name: Purging the rest - nothing should change
+      oxlorg.opnsense.tailscale_subnet_multi:
+        subnets_purge:
+          - subnet: '192.168.71.0/24'
+          - subnet: '192.168.72.0/24'
+      register: opn9
+      failed_when: >
+        opn9.failed or
+        opn9.changed
+
+    - name: Cleanup
+      oxlorg.opnsense.tailscale_subnet:
+        subnet: "{{ item }}"
+        state: 'absent'
+      loop:
+        - '192.168.71.0/24'
+        - '192.168.72.0/24'
+        - '192.168.73.0/24'
+        - 'fd00:71::/64'

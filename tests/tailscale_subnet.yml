@@ -1,0 +1,141 @@
+---
+- name: Testing Tailscale Subnet
+  hosts: localhost
+  gather_facts: no
+  module_defaults:
+    group/oxlorg.opnsense.all:
+      firewall: "{{ lookup('ansible.builtin.env', 'TEST_FIREWALL') }}"
+      api_credential_file: "{{ lookup('ansible.builtin.env', 'TEST_API_KEY') }}"
+      ssl_verify: false
+
+    oxlorg.opnsense.list:
+      target: 'tailscale_subnet'
+
+  environment:
+    HTTPS_PROXY: "{{ lookup('ansible.builtin.env', 'TEST_PROXY') | default('') }}"
+
+  tasks:
+    # the routes a box already advertises are left alone - the test only counts
+    # its own additions on top of them
+    - name: Listing
+      oxlorg.opnsense.list:
+      register: opn_pre1
+      failed_when: >
+        opn_pre1.failed or
+        'data' not in opn_pre1
+
+    - name: Remembering the pre-existing routes
+      ansible.builtin.set_fact:
+        subnets_pre: "{{ opn_pre1.data | length }}"
+
+    - name: Removing - does not exist
+      oxlorg.opnsense.tailscale_subnet:
+        subnet: '192.168.69.0/24'
+        state: 'absent'
+      register: opn_pre2
+      failed_when: >
+        opn_pre2.failed or
+        opn_pre2.changed
+
+    - name: Adding 1 - failing because no subnet was provided
+      oxlorg.opnsense.tailscale_subnet:
+        description: 'ANSIBLE_TEST_1_1'
+      register: opn_fail1
+      failed_when: not opn_fail1.failed
+
+    - name: Adding 1 - failing because the netmask is missing
+      oxlorg.opnsense.tailscale_subnet:
+        subnet: '192.168.69.0'
+      register: opn_fail2
+      failed_when: not opn_fail2.failed
+
+    - name: Adding 1 - failing because the host-bits are set
+      oxlorg.opnsense.tailscale_subnet:
+        subnet: '192.168.69.1/24'
+      register: opn_fail3
+      failed_when: not opn_fail3.failed
+
+    - name: Adding 1
+      oxlorg.opnsense.tailscale_subnet:
+        subnet: '192.168.69.0/24'
+        description: 'ANSIBLE_TEST_1_1'
+      register: opn1
+      failed_when: >
+        opn1.failed or
+        not opn1.changed
+
+    - name: Adding 1 - nothing changed
+      oxlorg.opnsense.tailscale_subnet:
+        subnet: '192.168.69.0/24'
+        description: 'ANSIBLE_TEST_1_1'
+      register: opn2
+      failed_when: >
+        opn2.failed or
+        opn2.changed
+      when: not ansible_check_mode
+
+    - name: Changing 1
+      oxlorg.opnsense.tailscale_subnet:
+        subnet: '192.168.69.0/24'
+        description: 'ANSIBLE_TEST_1_2'
+      register: opn3
+      failed_when: >
+        opn3.failed or
+        not opn3.changed
+      when: not ansible_check_mode
+
+    - name: Changing 1 - nothing changed
+      oxlorg.opnsense.tailscale_subnet:
+        subnet: '192.168.69.0/24'
+        description: 'ANSIBLE_TEST_1_2'
+      register: opn4
+      failed_when: >
+        opn4.failed or
+        opn4.changed
+      when: not ansible_check_mode
+
+    - name: Adding 2 - an IPv6 route
+      oxlorg.opnsense.tailscale_subnet:
+        subnet: 'fd00:69::/64'
+        description: 'ANSIBLE_TEST_1_3'
+      register: opn5
+      failed_when: >
+        opn5.failed or
+        not opn5.changed
+      when: not ansible_check_mode
+
+    - name: Listing
+      oxlorg.opnsense.list:
+      register: opn6
+      failed_when: >
+        'data' not in opn6 or
+        opn6.data | length != (subnets_pre | int) + 2
+      when: not ansible_check_mode
+
+    - name: Removing 1
+      oxlorg.opnsense.tailscale_subnet:
+        subnet: '192.168.69.0/24'
+        state: 'absent'
+      register: opn7
+      failed_when: >
+        opn7.failed or
+        not opn7.changed
+      when: not ansible_check_mode
+
+    - name: Removing 2
+      oxlorg.opnsense.tailscale_subnet:
+        subnet: 'fd00:69::/64'
+        state: 'absent'
+      register: opn8
+      failed_when: >
+        opn8.failed or
+        not opn8.changed
+      when: not ansible_check_mode
+
+    - name: Listing
+      oxlorg.opnsense.list:
+      register: opn9
+      failed_when: >
+        'data' not in opn9 or
+        opn9.data | length != (subnets_pre | int)
+      when: not ansible_check_mode
