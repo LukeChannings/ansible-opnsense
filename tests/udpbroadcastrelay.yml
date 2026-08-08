@@ -1,0 +1,179 @@
+---
+- name: Testing UDP Broadcast Relay
+  hosts: localhost
+  gather_facts: no
+  module_defaults:
+    group/oxlorg.opnsense.all:
+      firewall: "{{ lookup('ansible.builtin.env', 'TEST_FIREWALL') }}"
+      api_credential_file: "{{ lookup('ansible.builtin.env', 'TEST_API_KEY') }}"
+      ssl_verify: false
+
+    oxlorg.opnsense.list:
+      target: 'udpbroadcastrelay'
+
+  vars:
+    if1: "{{ lookup('ansible.builtin.env', 'TEST_UBR_IF1') | default('lan', true) }}"
+    if2: "{{ lookup('ansible.builtin.env', 'TEST_UBR_IF2') | default('wan', true) }}"
+
+  environment:
+    HTTPS_PROXY: "{{ lookup('ansible.builtin.env', 'TEST_PROXY') | default('') }}"
+
+  tasks:
+    - name: Listing
+      oxlorg.opnsense.list:
+      register: opn_pre1
+      failed_when: >
+        'data' not in opn_pre1 or
+        opn_pre1.data | length != 0
+
+    - name: Removing - does not exist
+      oxlorg.opnsense.udpbroadcastrelay:
+        instance_id: 61
+        state: 'absent'
+      register: opn_pre2
+      failed_when: >
+        opn_pre2.failed or
+        opn_pre2.changed
+
+    - name: Adding 1 - failing because no listen-port was provided
+      oxlorg.opnsense.udpbroadcastrelay:
+        instance_id: 61
+        interfaces: ['{{ if1 }}', '{{ if2 }}']
+      register: opn_fail1
+      failed_when: not opn_fail1.failed
+
+    - name: Adding 1 - failing because only one interface was provided
+      oxlorg.opnsense.udpbroadcastrelay:
+        instance_id: 61
+        listen_port: 19001
+        interfaces: ['{{ if1 }}']
+      register: opn_fail2
+      failed_when: not opn_fail2.failed
+
+    - name: Adding 1 - failing because of an invalid instance-id
+      oxlorg.opnsense.udpbroadcastrelay:
+        instance_id: 64
+        listen_port: 19001
+        interfaces: ['{{ if1 }}', '{{ if2 }}']
+      register: opn_fail3
+      failed_when: not opn_fail3.failed
+
+    - name: Adding 1 - failing because of an IPv6 multicast-address
+      oxlorg.opnsense.udpbroadcastrelay:
+        instance_id: 61
+        listen_port: 19001
+        interfaces: ['{{ if1 }}', '{{ if2 }}']
+        multicast_address: ['ff02::c']
+      register: opn_fail4
+      failed_when: not opn_fail4.failed
+
+    - name: Adding 1
+      oxlorg.opnsense.udpbroadcastrelay:
+        instance_id: 61
+        listen_port: 19001
+        interfaces: ['{{ if1 }}', '{{ if2 }}']
+        description: 'ANSIBLE_TEST_1_1'
+      register: opn1
+      failed_when: >
+        opn1.failed or
+        not opn1.changed
+
+    - name: Adding 1 - nothing changed
+      oxlorg.opnsense.udpbroadcastrelay:
+        instance_id: 61
+        listen_port: 19001
+        interfaces: ['{{ if1 }}', '{{ if2 }}']
+        description: 'ANSIBLE_TEST_1_1'
+      register: opn2
+      failed_when: >
+        opn2.failed or
+        opn2.changed
+      when: not ansible_check_mode
+
+    - name: Changing 1
+      oxlorg.opnsense.udpbroadcastrelay:
+        instance_id: 61
+        listen_port: 19002
+        interfaces: ['{{ if1 }}', '{{ if2 }}']
+        multicast_address: ['239.255.255.250']
+        source_address: '1.1.1.1'
+        revert_ttl: true
+        description: 'ANSIBLE_TEST_1_2'
+      register: opn3
+      failed_when: >
+        opn3.failed or
+        not opn3.changed
+      when: not ansible_check_mode
+
+    - name: Changing 1 - nothing changed
+      oxlorg.opnsense.udpbroadcastrelay:
+        instance_id: 61
+        listen_port: 19002
+        interfaces: ['{{ if1 }}', '{{ if2 }}']
+        multicast_address: ['239.255.255.250']
+        source_address: '1.1.1.1'
+        revert_ttl: true
+        description: 'ANSIBLE_TEST_1_2'
+      register: opn4
+      failed_when: >
+        opn4.failed or
+        opn4.changed
+      when: not ansible_check_mode
+
+    - name: Disabling 1
+      oxlorg.opnsense.udpbroadcastrelay:
+        instance_id: 61
+        listen_port: 19002
+        interfaces: ['{{ if1 }}', '{{ if2 }}']
+        multicast_address: ['239.255.255.250']
+        source_address: '1.1.1.1'
+        revert_ttl: true
+        description: 'ANSIBLE_TEST_1_2'
+        enabled: false
+      register: opn5
+      failed_when: >
+        opn5.failed or
+        not opn5.changed
+      when: not ansible_check_mode
+
+    - name: Disabling 1 - nothing changed
+      oxlorg.opnsense.udpbroadcastrelay:
+        instance_id: 61
+        listen_port: 19002
+        interfaces: ['{{ if1 }}', '{{ if2 }}']
+        multicast_address: ['239.255.255.250']
+        source_address: '1.1.1.1'
+        revert_ttl: true
+        description: 'ANSIBLE_TEST_1_2'
+        enabled: false
+      register: opn6
+      failed_when: >
+        opn6.failed or
+        opn6.changed
+      when: not ansible_check_mode
+
+    - name: Listing
+      oxlorg.opnsense.list:
+      register: opn7
+      failed_when: >
+        'data' not in opn7 or
+        opn7.data | length != 1
+      when: not ansible_check_mode
+
+    - name: Removing 1
+      oxlorg.opnsense.udpbroadcastrelay:
+        instance_id: 61
+        state: 'absent'
+      register: opn8
+      failed_when: >
+        opn8.failed or
+        not opn8.changed
+      when: not ansible_check_mode
+
+    - name: Listing
+      oxlorg.opnsense.list:
+      register: opn9
+      failed_when: >
+        'data' not in opn9 or
+        opn9.data | length != 0
+      when: not ansible_check_mode
