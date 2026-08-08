@@ -261,6 +261,7 @@ run_test_soft 'haproxy_healthcheck' 1
 run_test_soft 'haproxy_server' 1
 run_test_soft 'nut' 1
 run_test_soft 'nut_diagnostics' 1
+run_test_soft 'udpbroadcastrelay' 1
 
 run_test_soft '1_cleanup' 0
 run_test_soft '1_reload' 0

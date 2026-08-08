@@ -207,6 +207,8 @@ action_groups:
   nut:
     - oxlorg.opnsense.nut
     - oxlorg.opnsense.nut_diagnostics
+  udpbroadcastrelay:
+    - oxlorg.opnsense.udpbroadcastrelay
   all:
     - metadata:
         extend_group:
@@ -240,6 +242,7 @@ action_groups:
           - oxlorg.opnsense.haproxy
           - oxlorg.opnsense.nut
           - oxlorg.opnsense.nut_diagnostics
+          - oxlorg.opnsense.udpbroadcastrelay
 
 plugin_routing:
   modules:
@@ -301,3 +304,5 @@ plugin_routing:
       redirect: oxlorg.opnsense.nat_destination
     wireguard_client:
       redirect: oxlorg.opnsense.wireguard_peer
+    udp_broadcast_relay:
+      redirect: oxlorg.opnsense.udpbroadcastrelay

@@ -1251,3 +1251,10 @@
         - 'ANSIBLE_TEST_1_4'
         - 'ANSIBLE_TEST_1_5'
         - 'ANSIBLE_TEST_BACKEND_1'
+
+    - name: Cleanup UDP Broadcast Relays
+      oxlorg.opnsense.udpbroadcastrelay:
+        instance_id: "{{ item }}"
+        state: 'absent'
+      loop:
+        - 61
