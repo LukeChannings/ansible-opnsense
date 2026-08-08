@@ -217,6 +217,9 @@ action_groups:
     - oxlorg.opnsense.trust_ca
     - oxlorg.opnsense.trust_cert
     - oxlorg.opnsense.trust_export
+  udpbroadcastrelay:
+    - oxlorg.opnsense.udpbroadcastrelay
+    - oxlorg.opnsense.udpbroadcastrelay_multi
   all:
     - metadata:
         extend_group:
@@ -252,6 +255,7 @@ action_groups:
           - oxlorg.opnsense.nut_diagnostics
           - oxlorg.opnsense.radvd
           - oxlorg.opnsense.trust
+          - oxlorg.opnsense.udpbroadcastrelay
 
 plugin_routing:
   modules:
@@ -313,3 +317,5 @@ plugin_routing:
       redirect: oxlorg.opnsense.nat_destination
     wireguard_client:
       redirect: oxlorg.opnsense.wireguard_peer
+    udp_broadcast_relay:
+      redirect: oxlorg.opnsense.udpbroadcastrelay
