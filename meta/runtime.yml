@@ -220,6 +220,8 @@ action_groups:
   udpbroadcastrelay:
     - oxlorg.opnsense.udpbroadcastrelay
     - oxlorg.opnsense.udpbroadcastrelay_multi
+  nodeexporter:
+    - oxlorg.opnsense.nodeexporter
   all:
     - metadata:
         extend_group:
@@ -256,6 +258,7 @@ action_groups:
           - oxlorg.opnsense.radvd
           - oxlorg.opnsense.trust
           - oxlorg.opnsense.udpbroadcastrelay
+          - oxlorg.opnsense.nodeexporter
 
 plugin_routing:
   modules:
@@ -319,3 +322,5 @@ plugin_routing:
       redirect: oxlorg.opnsense.wireguard_peer
     udp_broadcast_relay:
       redirect: oxlorg.opnsense.udpbroadcastrelay
+    node_exporter:
+      redirect: oxlorg.opnsense.nodeexporter

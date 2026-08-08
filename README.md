@@ -265,6 +265,7 @@ not implemented => development => [testing](https://github.com/O-X-L/ansible-opn
 | **HAProxy**               | oxlorg.opnsense.haproxy_fcgi                                   | [Docs](https://ansible-opnsense.oxl.app/modules/haproxy.html)                                                   | unstable |
 | **UDP Broadcast Relay**   | oxlorg.opnsense.udpbroadcastrelay                              | [Docs](https://ansible-opnsense.oxl.app/modules/udpbroadcastrelay.html)                                         | unstable |
 | **UDP Broadcast Relay**   | oxlorg.opnsense.udpbroadcastrelay_multi                        | [Docs](https://ansible-opnsense.oxl.app/modules/udpbroadcastrelay.html#oxlorg-opnsense-udpbroadcastrelay-multi) | unstable |
+| **Node Exporter**         | oxlorg.opnsense.nodeexporter                                   | [Docs](https://ansible-opnsense.oxl.app/modules/nodeexporter.html)                                              | unstable |
 
 ### Roadmap
 
