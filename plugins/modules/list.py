@@ -26,33 +26,32 @@ except MODULE_EXCEPTIONS:
 TARGETS = [
     'alias', 'rule', 'rule_interface_group', 'route', 'gateway', 'syslog', 'package', 'unbound_host',
     'frr_ospf_general', 'frr_ospf3_general', 'unbound_forward', 'shaper_pipe', 'shaper_queue', 'shaper_rule',
-    'monit_service', 'monit_test', 'monit_alert', 'wireguard_server', 'bind_domain', 'wireguard_peer', 'interface_vlan',
-    'unbound_host_alias', 'interface_vxlan', 'frr_bfd_neighbor', 'frr_bgp_general', 'frr_bgp_neighbor',
-    'frr_ospf3_interface', 'frr_ospf_interface', 'bind_acl', 'frr_ospf_network', 'frr_rip', 'bind_general',
-    'bind_blocklist', 'bind_record', 'interface_vip', 'webproxy_general', 'webproxy_cache', 'webproxy_parent',
-    'webproxy_traffic', 'webproxy_remote_acl', 'webproxy_pac_proxy', 'webproxy_pac_match', 'webproxy_pac_rule',
-    'cron', 'unbound_dot', 'ipsec_cert', 'ipsec_psk', 'source_nat', 'frr_bgp_prefix_list', 'frr_bgp_community_list',
-    'frr_bgp_as_path', 'frr_bgp_route_map', 'frr_ospf_prefix_list', 'frr_ospf_route_map', 'webproxy_forward',
-    'webproxy_acl', 'webproxy_icap', 'webproxy_auth', 'nginx_upstream_server', 'ipsec_connection', 'ipsec_pool',
-    'ipsec_child', 'ipsec_vti', 'ipsec_auth_local', 'ipsec_auth_remote', 'frr_general', 'unbound_general',
-    'unbound_acl', 'ids_general', 'ids_policy', 'ids_rule', 'ids_ruleset', 'ids_user_rule', 'ids_policy_rule',
-    'openvpn_instance', 'openvpn_static_key', 'openvpn_client_override', 'dhcrelay_destination', 'dhcrelay_relay',
-    'interface_lagg', 'interface_loopback', 'unbound_dnsbl', 'dhcp_reservation', 'acme_general', 'acme_account',
-    'acme_validation', 'acme_action', 'acme_certificate', 'postfix_general', 'postfix_domain', 'postfix_recipient',
-    'postfix_recipientbcc', 'postfix_sender', 'postfix_senderbcc', 'postfix_sendercanonical', 'postfix_headercheck',
-    'postfix_address', 'dhcp_subnet', 'dhcp_general', 'interface_gre', 'nat_one_to_one', 'nat_source', 'dhcp_option',
-    'nat_destination', 'dhcp_ddns',
-    'ipsec_manual_spd', 'hasync_general', 'snapshot', 'frr_bgp_redistribution', 'frr_ospf_redistribution',
-    'frr_ospf3_redistribution', 'frr_ospf3_route_map', 'frr_ospf3_prefix_list', 'frr_ospf3_network',
-    'frr_bgp_peer_group', 'user', 'group', 'privilege', 'interface_bridge', 'interface_gif', 'neighbor',
-    'dnsmasq_general', 'ipsec_general', 'dnsmasq_domain', 'dnsmasq_host', 'dnsmasq_range', 'dnsmasq_option',
-    'dnsmasq_boot', 'dnsmasq_tag', 'haproxy_general_settings', 'haproxy_general_cache', 'haproxy_general_defaults',
-    'haproxy_general_logging', 'haproxy_general_peers', 'haproxy_general_stats', 'haproxy_general_tuning',
-    'haproxy_maintenance', 'haproxy_cpu', 'haproxy_user', 'haproxy_group', 'haproxy_acl', 'haproxy_action',
-    'haproxy_lua', 'haproxy_fcgi', 'haproxy_errorfile', 'haproxy_mailer', 'haproxy_mapfile',
-    'haproxy_resolver', 'haproxy_backend', 'haproxy_frontend', 'haproxy_healthcheck', 'haproxy_server',
-    'wazuh_agent', 'nut', 'interface_assignment', 'radvd', 'trust_ca', 'trust_cert', 'udpbroadcastrelay',
-    'nodeexporter',
+    'monit_service', 'monit_test', 'monit_alert', 'wireguard_server', 'bind_domain', 'wireguard_peer',
+    'interface_vlan', 'unbound_host_alias', 'interface_vxlan', 'frr_bfd_neighbor', 'frr_bgp_general',
+    'frr_bgp_neighbor', 'frr_ospf3_interface', 'frr_ospf_interface', 'bind_acl', 'frr_ospf_network', 'frr_rip',
+    'bind_general', 'bind_blocklist', 'bind_record', 'interface_vip', 'webproxy_general', 'webproxy_cache',
+    'webproxy_parent', 'webproxy_traffic', 'webproxy_remote_acl', 'webproxy_pac_proxy', 'webproxy_pac_match',
+    'webproxy_pac_rule', 'cron', 'unbound_dot', 'ipsec_cert', 'ipsec_psk', 'source_nat', 'frr_bgp_prefix_list',
+    'frr_bgp_community_list', 'frr_bgp_as_path', 'frr_bgp_route_map', 'frr_ospf_prefix_list', 'frr_ospf_route_map',
+    'webproxy_forward', 'webproxy_acl', 'webproxy_icap', 'webproxy_auth', 'nginx_upstream_server', 'ipsec_connection',
+    'ipsec_pool', 'ipsec_child', 'ipsec_vti', 'ipsec_auth_local', 'ipsec_auth_remote', 'frr_general',
+    'unbound_general', 'unbound_acl', 'ids_general', 'ids_policy', 'ids_rule', 'ids_ruleset', 'ids_user_rule',
+    'ids_policy_rule', 'openvpn_instance', 'openvpn_static_key', 'openvpn_client_override', 'dhcrelay_destination',
+    'dhcrelay_relay', 'interface_lagg', 'interface_loopback', 'unbound_dnsbl', 'dhcp_reservation', 'acme_general',
+    'acme_account', 'acme_validation', 'acme_action', 'acme_certificate', 'postfix_general', 'postfix_domain',
+    'postfix_recipient', 'postfix_recipientbcc', 'postfix_sender', 'postfix_senderbcc', 'postfix_sendercanonical',
+    'postfix_headercheck', 'postfix_address', 'dhcp_subnet', 'dhcp_general', 'interface_gre', 'nat_one_to_one',
+    'nat_source', 'dhcp_option', 'nat_destination', 'dhcp_ddns', 'ipsec_manual_spd', 'hasync_general', 'snapshot',
+    'frr_bgp_redistribution', 'frr_ospf_redistribution', 'frr_ospf3_redistribution', 'frr_ospf3_route_map',
+    'frr_ospf3_prefix_list', 'frr_ospf3_network', 'frr_bgp_peer_group', 'user', 'group', 'privilege',
+    'interface_bridge', 'interface_gif', 'neighbor', 'dnsmasq_general', 'ipsec_general', 'dnsmasq_domain',
+    'dnsmasq_host', 'dnsmasq_range', 'dnsmasq_option', 'dnsmasq_boot', 'dnsmasq_tag', 'haproxy_general_settings',
+    'haproxy_general_cache', 'haproxy_general_defaults', 'haproxy_general_logging', 'haproxy_general_peers',
+    'haproxy_general_stats', 'haproxy_general_tuning', 'haproxy_maintenance', 'haproxy_cpu', 'haproxy_user',
+    'haproxy_group', 'haproxy_acl', 'haproxy_action', 'haproxy_lua', 'haproxy_fcgi', 'haproxy_errorfile',
+    'haproxy_mailer', 'haproxy_mapfile', 'haproxy_resolver', 'haproxy_backend', 'haproxy_frontend',
+    'haproxy_healthcheck', 'haproxy_server', 'wazuh_agent', 'nut', 'interface_assignment', 'radvd', 'trust_ca',
+    'trust_cert', 'udpbroadcastrelay', 'nodeexporter', 'crowdsec_general',
 ]
 
 
@@ -717,6 +716,10 @@ def run_module():
 
         elif target == 'nodeexporter':
             from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.nodeexporter import \
+                General as Target_Obj
+
+        elif target == 'crowdsec_general':
+            from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.crowdsec_general import \
                 General as Target_Obj
 
     except AttributeError:

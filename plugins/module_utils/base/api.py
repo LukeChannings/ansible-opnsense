@@ -43,8 +43,12 @@ class Session:
     HTTP_CLIENT_BACKEND_HTTPX = 'httpx'
     HTTP_CLIENT_BACKEND_REQUESTS = 'requests'
 
-    def __init__(self, module: AnsibleModule, timeout: float = DEFAULT_TIMEOUT):
+    def __init__(
+            self, module: AnsibleModule, timeout: float = DEFAULT_TIMEOUT,
+            no_log_fields: list = None,
+    ):
         self.m = module
+        self.no_log_fields = no_log_fields or []
         if not HAS_LIB_HTTPX and not HAS_LIB_REQUESTS:
             self.m.fail_json(msg="Either 'httpx' or 'requests' must be installed on the target host.")
 
@@ -165,7 +169,8 @@ class Session:
                 module=self.m,
                 cnf=cnf,
                 http_client_lib=self._http_client_lib,
-                response=raw_response
+                response=raw_response,
+                no_log_fields=self.no_log_fields,
             )
 
         except REQUEST_EXCEPTIONS as error:
@@ -197,6 +202,7 @@ class Session:
             data=data,
             headers=headers,
             http_client_lib=self._http_client_lib,
+            no_log_fields=self.no_log_fields,
         )
 
         try:
@@ -218,7 +224,8 @@ class Session:
                 module=self.m,
                 cnf=cnf,
                 http_client_lib=self._http_client_lib,
-                response=raw_response
+                response=raw_response,
+                no_log_fields=self.no_log_fields,
             )
 
         except REQUEST_EXCEPTIONS as error:
