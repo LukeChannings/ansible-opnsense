@@ -51,7 +51,7 @@ TARGETS = [
     'haproxy_maintenance', 'haproxy_cpu', 'haproxy_user', 'haproxy_group', 'haproxy_acl', 'haproxy_action',
     'haproxy_lua', 'haproxy_fcgi', 'haproxy_errorfile', 'haproxy_mailer', 'haproxy_mapfile',
     'haproxy_resolver', 'haproxy_backend', 'haproxy_frontend', 'haproxy_healthcheck', 'haproxy_server',
-    'wazuh_agent', 'nut', 'udpbroadcastrelay', 'nodeexporter',
+    'wazuh_agent', 'nut', 'udpbroadcastrelay', 'nodeexporter', 'crowdsec_general',
 ]
 
 
@@ -692,6 +692,10 @@ def run_module():
 
         elif target == 'nodeexporter':
             from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.nodeexporter import \
+                General as Target_Obj
+
+        elif target == 'crowdsec_general':
+            from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.crowdsec_general import \
                 General as Target_Obj
 
     except AttributeError:

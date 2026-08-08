@@ -60,6 +60,7 @@ def run_module():
                 'nut',
                 'udpbroadcastrelay',
                 'nodeexporter',
+                'crowdsec',
             ],
             description='What part of the running config should be reloaded'
         ),
@@ -210,6 +211,10 @@ def run_module():
 
         elif target == 'nodeexporter':
             from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.nodeexporter import \
+                General as Target_Obj
+
+        elif target == 'crowdsec':
+            from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.crowdsec_general import \
                 General as Target_Obj
 
     except MODULE_EXCEPTIONS:

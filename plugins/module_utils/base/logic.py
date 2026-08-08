@@ -57,10 +57,14 @@ class BaseLogic:
     ]
 
     def __init__(self, m, r: dict, s: Session = None):
+        no_log_fields = self._api_no_log_fields()
+
         if hasattr(self, 'TIMEOUT'):
-            self.s = Session(module=m, timeout=self.TIMEOUT) if s is None else s
+            self.s = Session(
+                module=m, timeout=self.TIMEOUT, no_log_fields=no_log_fields,
+            ) if s is None else s
         else:
-            self.s = Session(module=m) if s is None else s
+            self.s = Session(module=m, no_log_fields=no_log_fields) if s is None else s
 
         self.m = m
         self.p = m.params
@@ -78,6 +82,26 @@ class BaseLogic:
                 exit_bug(f"Module has no '{attr}' attribute set!")
 
         self._init_defaults()
+
+    @classmethod
+    def _api_no_log_fields(cls) -> list:
+        translate = getattr(cls, cls.ATTR_TRANSLATE, {})
+        fields = []
+
+        for field in getattr(cls, cls.ATTR_DIFF_NO_LOG, []):
+            fields.append(field)
+            opn_field = translate.get(field, field)
+
+            if isinstance(opn_field, tuple):
+                opn_field = opn_field[-1]
+
+            elif isinstance(opn_field, list):
+                opn_field = opn_field[0]
+
+            if opn_field not in fields:
+                fields.append(opn_field)
+
+        return fields
 
     def _init_defaults(self):
         if not hasattr(self, self.ATTR_API_MOD):
@@ -344,10 +368,14 @@ class BaseLogic:
                         self.r['changed'] = True
 
                         if self.p['debug']:
-                            self.m.warn(
-                                f"Field changed: '{field}' "
-                                f"'{self.e[field]}' != '{self.p[field]}'"
-                            )
+                            if field in getattr(self, self.ATTR_DIFF_NO_LOG, []):
+                                self.m.warn(f"Field changed: '{field}'")
+
+                            else:
+                                self.m.warn(
+                                    f"Field changed: '{field}' "
+                                    f"'{self.e[field]}' != '{self.p[field]}'"
+                                )
 
                         break
 

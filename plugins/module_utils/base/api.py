@@ -18,8 +18,12 @@ HTTPX_EXCEPTIONS = (
 
 
 class Session:
-    def __init__(self, module: AnsibleModule, timeout: float = DEFAULT_TIMEOUT):
+    def __init__(
+            self, module: AnsibleModule, timeout: float = DEFAULT_TIMEOUT,
+            no_log_fields: list = None,
+    ):
         self.m = module
+        self.no_log_fields = no_log_fields or []
         self.s = self._start(timeout)
 
     def _start(self, timeout: float) -> httpx.Client:
@@ -68,7 +72,8 @@ class Session:
             response = check_response(
                 module=self.m,
                 cnf=cnf,
-                response=self.s.get(url=call_url)
+                response=self.s.get(url=call_url),
+                no_log_fields=self.no_log_fields,
             )
 
         except HTTPX_EXCEPTIONS as error:
@@ -99,6 +104,7 @@ class Session:
             url=f'{self.s.base_url}{call_url}',
             data=data,
             headers=headers,
+            no_log_fields=self.no_log_fields,
         )
 
         try:
@@ -107,7 +113,8 @@ class Session:
                 cnf=cnf,
                 response=self.s.post(
                     url=call_url, json=data, headers=headers
-                )
+                ),
+                no_log_fields=self.no_log_fields,
             )
 
         except HTTPX_EXCEPTIONS as error:

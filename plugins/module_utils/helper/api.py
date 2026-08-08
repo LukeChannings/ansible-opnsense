@@ -3,6 +3,8 @@ from pathlib import Path
 from json import JSONDecodeError
 from json import dumps as json_dumps
 from datetime import datetime
+from re import escape as regex_escape
+from re import sub as regex_sub
 
 from ansible.module_utils.basic import AnsibleModule
 
@@ -12,6 +14,8 @@ from ansible_collections.oxlorg.opnsense.plugins.module_utils.helper.main import
     ensure_list
 from ansible_collections.oxlorg.opnsense.plugins.module_utils.helper.validate import \
     is_valid_domain, is_ip
+
+VALUE_NO_LOG = 'VALUE_SPECIFIED_IN_NO_LOG_PARAMETER'
 
 
 def _load_credential_file(module: AnsibleModule) -> tuple[(str, None), (str, None)]:
@@ -113,7 +117,7 @@ def get_params_path(cnf: dict) -> str:
     return params_path
 
 
-def _clean_response(response: dict) -> dict:
+def _clean_response(response: dict, no_log_fields: list = None) -> dict:
     response_data = response.copy()
     for field in [
         'headers', 'next_request', '_decoder', 'stream', 'extensions', 'history', 'is_closed',
@@ -122,18 +126,46 @@ def _clean_response(response: dict) -> dict:
         if field in response_data:
             response_data.pop(field)
 
+    if no_log_fields and '_content' in response_data:
+        response_data['_content'] = _redact_content(response_data['_content'], no_log_fields)
+
     return response_data
+
+
+def _redact_content(content: bytes, no_log_fields: list) -> bytes:
+    for field in no_log_fields:
+        content = regex_sub(
+            rb'("' + regex_escape(str(field).encode()) + rb'"\s*:\s*)"[^"]*"',
+            rb'\1"' + VALUE_NO_LOG.encode() + rb'"',
+            content,
+        )
+
+    return content
+
+
+def _redact_data(data, no_log_fields: list):
+    if isinstance(data, dict):
+        return {
+            key: VALUE_NO_LOG if key in no_log_fields else _redact_data(value, no_log_fields)
+            for key, value in data.items()
+        }
+
+    if isinstance(data, list):
+        return [_redact_data(value, no_log_fields) for value in data]
+
+    return data
 
 
 def debug_api(
         module: AnsibleModule, method: str = None, url: str = None,
         data: dict = None, headers: dict = None, response: dict = None,
+        no_log_fields: list = None,
 ) -> None:
     if 'debug' not in module.params or not module.params['debug']:
         return
 
     if response is not None:
-        msg = f"RESPONSE: '{_clean_response(response.__dict__)}'"
+        msg = f"RESPONSE: '{_clean_response(response.__dict__, no_log_fields)}'"
 
     else:
         msg = f'REQUEST: {method} | URL: {url}'
@@ -142,6 +174,9 @@ def debug_api(
             msg += f" | HEADERS: '{headers}'"
 
         if data is not None:
+            if no_log_fields:
+                data = _redact_data(data, no_log_fields)
+
             msg += f" | DATA: '{json_dumps(data)}'"
 
         log_path = Path(DEBUG_CONFIG['path_log'])
@@ -157,8 +192,8 @@ def debug_api(
     module.warn(msg)
 
 
-def check_response(module: AnsibleModule, cnf: dict, response) -> dict:
-    debug_api(module=module, response=response)
+def check_response(module: AnsibleModule, cnf: dict, response, no_log_fields: list = None) -> dict:
+    debug_api(module=module, response=response, no_log_fields=no_log_fields)
 
     if 'allowed_http_stati' not in cnf:
         cnf['allowed_http_stati'] = [200]
