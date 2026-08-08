@@ -36,3 +36,4 @@
         - 'os-nut'
         - 'os-udpbroadcastrelay'
         - 'os-node_exporter'
+        - 'os-crowdsec'
