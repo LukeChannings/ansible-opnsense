@@ -3,6 +3,8 @@ from pathlib import Path
 from json import JSONDecodeError
 from json import dumps as json_dumps
 from datetime import datetime
+from re import escape as regex_escape
+from re import sub as regex_sub
 
 from ansible.module_utils.basic import AnsibleModule
 
@@ -12,6 +14,8 @@ from ansible_collections.oxlorg.opnsense.plugins.module_utils.helper.main import
     ensure_list
 from ansible_collections.oxlorg.opnsense.plugins.module_utils.helper.validate import \
     is_valid_domain, is_ip
+
+VALUE_NO_LOG = 'VALUE_SPECIFIED_IN_NO_LOG_PARAMETER'
 
 
 def _load_credential_file(module: AnsibleModule) -> tuple[(str, None), (str, None)]:
@@ -176,25 +180,70 @@ def _sanitize_response_for_logging_lib_requests(response_raw: dict) -> dict:
     return sanitized
 
 
-def _sanitize_response_for_logging(http_client_lib: str, response_raw: dict) -> dict:
+def _sanitize_response_for_logging(
+        http_client_lib: str, response_raw: dict, no_log_fields: list = None,
+) -> dict:
     # the full response contains the full request including plaintext secrets
 
     if http_client_lib == 'httpx':
-        return _sanitize_response_for_logging_lib_httpx(response_raw)
+        sanitized = _sanitize_response_for_logging_lib_httpx(response_raw)
 
-    return _sanitize_response_for_logging_lib_requests(response_raw)
+    else:
+        sanitized = _sanitize_response_for_logging_lib_requests(response_raw)
+
+    if no_log_fields and 'body' in sanitized:
+        sanitized['body'] = _redact_content(sanitized['body'], no_log_fields)
+
+    return sanitized
+
+
+def _redact_content(content, no_log_fields: list):
+    if not isinstance(content, (bytes, str)):
+        return content
+
+    raw = content.encode() if isinstance(content, str) else content
+
+    for field in no_log_fields:
+        raw = regex_sub(
+            rb'("' + regex_escape(str(field).encode()) + rb'"\s*:\s*)"[^"]*"',
+            rb'\1"' + VALUE_NO_LOG.encode() + rb'"',
+            raw,
+        )
+
+    return raw.decode() if isinstance(content, str) else raw
+
+
+def _redact_data(data, no_log_fields: list):
+    if isinstance(data, dict):
+        return {
+            key: VALUE_NO_LOG if key in no_log_fields else _redact_data(value, no_log_fields)
+            for key, value in data.items()
+        }
+
+    if isinstance(data, list):
+        return [_redact_data(value, no_log_fields) for value in data]
+
+    return data
 
 
 def debug_api(
         module: AnsibleModule, http_client_lib: str, method: str = None, url: str = None,
         data: dict = None, headers: dict = None, response: dict = None,
+        no_log_fields: list = None,
 ) -> None:
     if 'debug' not in module.params or not module.params['debug']:
         return
 
     if response is not None:
         # NOTE: we do not sanitize the response here because the user chose to enable debug-output
-        msg = f"CLI-LIB: {http_client_lib} | RESPONSE: '{response.__dict__}'"
+        #   no-log fields are still redacted - enabling debug must not leak secrets
+        response_data = response.__dict__
+
+        if no_log_fields and '_content' in response_data:
+            response_data = response_data.copy()
+            response_data['_content'] = _redact_content(response_data['_content'], no_log_fields)
+
+        msg = f"CLI-LIB: {http_client_lib} | RESPONSE: '{response_data}'"
 
     else:
         msg = f"CLI-LIB: {http_client_lib} | REQUEST: {method} | URL: {url}"
@@ -203,6 +252,9 @@ def debug_api(
             msg += f" | HEADERS: '{headers}'"
 
         if data is not None:
+            if no_log_fields:
+                data = _redact_data(data, no_log_fields)
+
             msg += f" | DATA: '{json_dumps(data)}'"
 
         log_path = Path(DEBUG_CONFIG['path_log'])
@@ -218,8 +270,14 @@ def debug_api(
     module.warn(msg)
 
 
-def check_response(module: AnsibleModule, cnf: dict, http_client_lib: str, response) -> dict:
-    debug_api(module=module, http_client_lib=http_client_lib, response=response)
+def check_response(
+        module: AnsibleModule, cnf: dict, http_client_lib: str, response,
+        no_log_fields: list = None,
+) -> dict:
+    debug_api(
+        module=module, http_client_lib=http_client_lib, response=response,
+        no_log_fields=no_log_fields,
+    )
 
     if 'allowed_http_stati' not in cnf:
         cnf['allowed_http_stati'] = [200]
@@ -233,6 +291,7 @@ def check_response(module: AnsibleModule, cnf: dict, http_client_lib: str, respo
     sanitized_response = _sanitize_response_for_logging(
         http_client_lib=http_client_lib,
         response_raw=response.__dict__,
+        no_log_fields=no_log_fields,
     )
     debug_info = " (set 'debug: true' for more info)"
     if 'debug' in module.params and module.params['debug']:
