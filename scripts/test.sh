@@ -272,6 +272,8 @@ run_test_soft 'trust_export' 0  # check mode => dependency on CA/certificate
 run_test_soft 'udpbroadcastrelay' 1
 run_test_soft 'nodeexporter' 1
 run_test_soft 'crowdsec_general' 1
+run_test_soft 'tailscale_general' 1
+run_test_soft 'tailscale_subnet' 1
 
 run_test_soft '1_cleanup' 0
 run_test_soft '1_reload' 0

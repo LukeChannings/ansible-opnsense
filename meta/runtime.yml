@@ -223,6 +223,9 @@ action_groups:
     - oxlorg.opnsense.nodeexporter
   crowdsec:
     - oxlorg.opnsense.crowdsec_general
+  tailscale:
+    - oxlorg.opnsense.tailscale_general
+    - oxlorg.opnsense.tailscale_subnet
   all:
     - metadata:
         extend_group:
@@ -261,6 +264,7 @@ action_groups:
           - oxlorg.opnsense.udpbroadcastrelay
           - oxlorg.opnsense.nodeexporter
           - oxlorg.opnsense.crowdsec
+          - oxlorg.opnsense.tailscale
 
 plugin_routing:
   modules:

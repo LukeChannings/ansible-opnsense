@@ -1322,3 +1322,11 @@
         state: 'absent'
       loop:
         - 61
+
+    - name: Cleanup Tailscale Subnets
+      oxlorg.opnsense.tailscale_subnet:
+        subnet: "{{ item }}"
+        state: 'absent'
+      loop:
+        - '192.168.69.0/24'
+        - 'fd00:69::/64'
