@@ -37,3 +37,4 @@
         - 'os-udpbroadcastrelay'
         - 'os-node_exporter'
         - 'os-crowdsec'
+        - 'os-tailscale'

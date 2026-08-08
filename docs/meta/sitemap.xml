@@ -65,4 +65,5 @@
    <url><loc>https://ansible-opnsense.oxl.app/modules/udpbroadcastrelay.html</loc></url>
    <url><loc>https://ansible-opnsense.oxl.app/modules/nodeexporter.html</loc></url>
    <url><loc>https://ansible-opnsense.oxl.app/modules/crowdsec.html</loc></url>
+   <url><loc>https://ansible-opnsense.oxl.app/modules/tailscale.html</loc></url>
 </urlset>
