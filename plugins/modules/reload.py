@@ -61,6 +61,7 @@ def run_module():
                 'interface_assignment',
                 'radvd',
                 'udpbroadcastrelay',
+                'nodeexporter',
             ],
             description='What part of the running config should be reloaded'
         ),
@@ -216,6 +217,10 @@ def run_module():
         elif target == 'udpbroadcastrelay':
             from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.udpbroadcastrelay import \
                 Relay as Target_Obj
+
+        elif target == 'nodeexporter':
+            from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.nodeexporter import \
+                General as Target_Obj
 
     except MODULE_EXCEPTIONS:
         module_dependency_error()
