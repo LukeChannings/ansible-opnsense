@@ -52,7 +52,7 @@ TARGETS = [
     'haproxy_lua', 'haproxy_fcgi', 'haproxy_errorfile', 'haproxy_mailer', 'haproxy_mapfile',
     'haproxy_resolver', 'haproxy_backend', 'haproxy_frontend', 'haproxy_healthcheck', 'haproxy_server',
     'wazuh_agent', 'nut', 'udpbroadcastrelay', 'nodeexporter', 'crowdsec_general',
-    'tailscale_general', 'tailscale_subnet', 'netflow',
+    'tailscale_general', 'tailscale_subnet', 'netflow', 'trust_ca', 'trust_cert',
 ]
 
 
@@ -710,6 +710,14 @@ def run_module():
         elif target == 'netflow':
             from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.netflow import \
                 General as Target_Obj
+
+        elif target == 'trust_ca':
+            from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.trust_ca import \
+                Ca as Target_Obj
+
+        elif target == 'trust_cert':
+            from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.trust_cert import \
+                Cert as Target_Obj
 
     except AttributeError:
         module_dependency_error()

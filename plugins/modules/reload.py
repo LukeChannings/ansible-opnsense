@@ -63,6 +63,7 @@ def run_module():
                 'crowdsec',
                 'tailscale',
                 'netflow',
+                'trust',
             ],
             description='What part of the running config should be reloaded'
         ),
@@ -226,6 +227,10 @@ def run_module():
         elif target == 'netflow':
             from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.netflow import \
                 General as Target_Obj
+
+        elif target == 'trust':
+            from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.trust_ca import \
+                Ca as Target_Obj
 
     except MODULE_EXCEPTIONS:
         module_dependency_error()

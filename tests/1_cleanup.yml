@@ -1266,3 +1266,20 @@
       loop:
         - '192.168.69.0/24'
         - 'fd00:69::/64'
+
+    - name: Cleanup certificates
+      oxlorg.opnsense.trust_cert:
+        description: "{{ item }}"
+        state: 'absent'
+        force: true
+      loop:
+        - 'ANSIBLE_TEST_2_1'
+
+    - name: Cleanup certificate authorities
+      oxlorg.opnsense.trust_ca:
+        description: "{{ item }}"
+        state: 'absent'
+        force: true
+      loop:
+        - 'ANSIBLE_TEST_1_1'
+        - 'ANSIBLE_TEST_1_2'

@@ -255,6 +255,8 @@ not implemented => development => [testing](https://github.com/O-X-L/ansible-opn
 | **Tailscale**             | oxlorg.opnsense.tailscale_general                              | [Docs](https://ansible-opnsense.oxl.app/modules/tailscale.html)                                                 | unstable |
 | **Tailscale**             | oxlorg.opnsense.tailscale_subnet                               | [Docs](https://ansible-opnsense.oxl.app/modules/tailscale.html)                                                 | unstable |
 | **NetFlow**               | oxlorg.opnsense.netflow                                        | [Docs](https://ansible-opnsense.oxl.app/modules/netflow.html)                                                   | unstable |
+| **Trust (Certificates)**  | oxlorg.opnsense.trust_ca                                       | [Docs](https://ansible-opnsense.oxl.app/modules/trust.html)                                                     | unstable |
+| **Trust (Certificates)**  | oxlorg.opnsense.trust_cert                                     | [Docs](https://ansible-opnsense.oxl.app/modules/trust.html)                                                     | unstable |
 
 ### Roadmap
 

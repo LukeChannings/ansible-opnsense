@@ -218,6 +218,9 @@ action_groups:
     - oxlorg.opnsense.tailscale_subnet
   netflow:
     - oxlorg.opnsense.netflow
+  trust:
+    - oxlorg.opnsense.trust_ca
+    - oxlorg.opnsense.trust_cert
   all:
     - metadata:
         extend_group:
@@ -256,6 +259,7 @@ action_groups:
           - oxlorg.opnsense.crowdsec
           - oxlorg.opnsense.tailscale
           - oxlorg.opnsense.netflow
+          - oxlorg.opnsense.trust
 
 plugin_routing:
   modules:

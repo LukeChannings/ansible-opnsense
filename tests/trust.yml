@@ -1,0 +1,401 @@
+---
+
+- name: Testing Trust (Certificates)
+  hosts: localhost
+  gather_facts: no
+  module_defaults:
+    group/oxlorg.opnsense.all:
+      firewall: "{{ lookup('ansible.builtin.env', 'TEST_FIREWALL') }}"
+      api_credential_file: "{{ lookup('ansible.builtin.env', 'TEST_API_KEY') }}"
+      ssl_verify: false
+
+  environment:
+    HTTPS_PROXY: "{{ lookup('ansible.builtin.env', 'TEST_PROXY') | default('') }}"
+
+  # throwaway key-material - self-signed authorities and the leaf-certificates
+  # they issued, valid until 2046. Any certificate already on the box is left
+  # untouched; the test only counts its own additions on top of them
+  vars:
+    ca1:
+      crt: |
+        -----BEGIN CERTIFICATE-----
+        MIIBmjCCAUCgAwIBAgIJAO7XUFUWGsNTMAoGCCqGSM49BAMCMEAxCzAJBgNVBAYT
+        AkFUMRUwEwYDVQQKDAxBTlNJQkxFIFRFU1QxGjAYBgNVBAMMEUFOU0lCTEUtVEVT
+        VC1DQS0xMB4XDTI2MDgwOTEwMjEwM1oXDTQ2MDgwNDEwMjEwM1owQDELMAkGA1UE
+        BhMCQVQxFTATBgNVBAoMDEFOU0lCTEUgVEVTVDEaMBgGA1UEAwwRQU5TSUJMRS1U
+        RVNULUNBLTEwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAQc2dnYmwoqduJcLsix
+        dhOGkosIcCHIO5gjIv0C0y8MLtlcWkY9s0y5AqU9c7iUK00gOrgwI3bMwgIGSc8d
+        1NHToyMwITAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAKBggqhkjO
+        PQQDAgNIADBFAiEA8jlnvVCELc/WLQqYGnYDSDxvIxIfGJqOwgsbnbn93qECIH0A
+        BehfHsK1PX39lJcyU+WpnjgUXFozVbQFZMLvKl4d
+        -----END CERTIFICATE-----
+      key: |
+        -----BEGIN EC PRIVATE KEY-----
+        MHcCAQEEICIyb1bZR/9r6Zl0e1XKc+M91Nwif1JMTYYaKyQQu+iFoAoGCCqGSM49
+        AwEHoUQDQgAEHNnZ2JsKKnbiXC7IsXYThpKLCHAhyDuYIyL9AtMvDC7ZXFpGPbNM
+        uQKlPXO4lCtNIDq4MCN2zMICBknPHdTR0w==
+        -----END EC PRIVATE KEY-----
+    ca2:
+      crt: |
+        -----BEGIN CERTIFICATE-----
+        MIIBmjCCAUCgAwIBAgIJAMFeGeG9gi89MAoGCCqGSM49BAMCMEAxCzAJBgNVBAYT
+        AkFUMRUwEwYDVQQKDAxBTlNJQkxFIFRFU1QxGjAYBgNVBAMMEUFOU0lCTEUtVEVT
+        VC1DQS0yMB4XDTI2MDgwOTEwMjEwM1oXDTQ2MDgwNDEwMjEwM1owQDELMAkGA1UE
+        BhMCQVQxFTATBgNVBAoMDEFOU0lCTEUgVEVTVDEaMBgGA1UEAwwRQU5TSUJMRS1U
+        RVNULUNBLTIwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAASYdLrFptxxKEQ0PzZe
+        wskyH+87aPnnAMSidW8FGzELLPbipQKO2xoksJMbB68zxIRgi/nYx8efARKxnBdY
+        7+3JoyMwITAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAKBggqhkjO
+        PQQDAgNIADBFAiAiEm/QdgRjegp5wQAaBPUB6iP7jNwhJJevNE4o9piMFAIhAO+B
+        IZ2wwzQNf6oHwNwQzlOd6h7waHGRONKM6MrAMxNz
+        -----END CERTIFICATE-----
+      key: |
+        -----BEGIN EC PRIVATE KEY-----
+        MHcCAQEEIB/OhBbW+6kppLpVgMwvV8Fko5Gs6Pxi5LpoJzMwzukOoAoGCCqGSM49
+        AwEHoUQDQgAEmHS6xabccShEND82XsLJMh/vO2j55wDEonVvBRsxCyz24qUCjtsa
+        JLCTGwevM8SEYIv52MfHnwESsZwXWO/tyQ==
+        -----END EC PRIVATE KEY-----
+    # both leaves are issued by ca1
+    leaf1:
+      crt: |
+        -----BEGIN CERTIFICATE-----
+        MIIB9jCCAZygAwIBAgIJAO0kDqNrZKeYMAoGCCqGSM49BAMCMEAxCzAJBgNVBAYT
+        AkFUMRUwEwYDVQQKDAxBTlNJQkxFIFRFU1QxGjAYBgNVBAMMEUFOU0lCTEUtVEVT
+        VC1DQS0xMB4XDTI2MDgwOTEwMjEwM1oXDTQ2MDgwNDEwMjEwM1owTDELMAkGA1UE
+        BhMCQVQxFTATBgNVBAoMDEFOU0lCTEUgVEVTVDEmMCQGA1UEAwwdYW5zaWJsZS10
+        ZXN0LTEub3Buc2Vuc2UubG9jYWwwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAATh
+        hH9/2Dw6Xbr04OaXluNRUedQA+m2CWCjQkWywTmkE3T18CT3EeIIuCHFIEaO+Yzv
+        H140EjI1UOP/yK8AhIlqo3MwcTAJBgNVHRMEAjAAMAsGA1UdDwQEAwIFoDATBgNV
+        HSUEDDAKBggrBgEFBQcDATBCBgNVHREEOzA5gh1hbnNpYmxlLXRlc3QtMS5vcG5z
+        ZW5zZS5sb2NhbIISYWx0Lm9wbnNlbnNlLmxvY2FshwTAqEUBMAoGCCqGSM49BAMC
+        A0gAMEUCIAdrw+QTrSFcinLsKwNNHzTbWQcaPodyobmBh534zn1mAiEAnzSM01MP
+        Tq8tbbxQZjexFlzKZDUACh67HE1aGk7Iviw=
+        -----END CERTIFICATE-----
+      key: |
+        -----BEGIN EC PRIVATE KEY-----
+        MHcCAQEEIHNn8KTW/ez3FmKQpxl6cQgXYMKwAgsVczQYos0dDBTfoAoGCCqGSM49
+        AwEHoUQDQgAE4YR/f9g8Ol269ODml5bjUVHnUAPptglgo0JFssE5pBN09fAk9xHi
+        CLghxSBGjvmM7x9eNBIyNVDj/8ivAISJag==
+        -----END EC PRIVATE KEY-----
+    leaf2:
+      crt: |
+        -----BEGIN CERTIFICATE-----
+        MIIB3DCCAYKgAwIBAgIJAO0kDqNrZKeZMAoGCCqGSM49BAMCMEAxCzAJBgNVBAYT
+        AkFUMRUwEwYDVQQKDAxBTlNJQkxFIFRFU1QxGjAYBgNVBAMMEUFOU0lCTEUtVEVT
+        VC1DQS0xMB4XDTI2MDgwOTEwMjEwM1oXDTQ2MDgwNDEwMjEwM1owTDELMAkGA1UE
+        BhMCQVQxFTATBgNVBAoMDEFOU0lCTEUgVEVTVDEmMCQGA1UEAwwdYW5zaWJsZS10
+        ZXN0LTIub3Buc2Vuc2UubG9jYWwwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAASV
+        6KsbygsrT+tKwUF2tTwaLwSBMrgX6O0CRYtkO+oIKmwds9n1cr2D0yn4J29vdTS1
+        xvXqlq11LuIz9cipIJH5o1kwVzAJBgNVHRMEAjAAMAsGA1UdDwQEAwIFoDATBgNV
+        HSUEDDAKBggrBgEFBQcDATAoBgNVHREEITAfgh1hbnNpYmxlLXRlc3QtMi5vcG5z
+        ZW5zZS5sb2NhbDAKBggqhkjOPQQDAgNIADBFAiEAglhWRX1qft5G0uqeMMxT2CgB
+        jzDrt0JwbEYobzedeHwCIADR/Ar6UQ7InWph1fUSkoEiqz6Np79epZRwfEG5iaJf
+        -----END CERTIFICATE-----
+      key: |
+        -----BEGIN EC PRIVATE KEY-----
+        MHcCAQEEIBlnKjIYovBgSTuPIBwUE3nbiIiIRBvITJi+Z6Q4aOmeoAoGCCqGSM49
+        AwEHoUQDQgAEleirG8oLK0/rSsFBdrU8Gi8EgTK4F+jtAkWLZDvqCCpsHbPZ9XK9
+        g9Mp+Cdvb3U0tcb16patdS7iM/XIqSCR+Q==
+        -----END EC PRIVATE KEY-----
+
+  tasks:
+    - name: Listing authorities
+      oxlorg.opnsense.list:
+        target: 'trust_ca'
+      register: opn_pre1
+      failed_when: >
+        opn_pre1.failed or
+        'data' not in opn_pre1
+
+    - name: Listing certificates
+      oxlorg.opnsense.list:
+        target: 'trust_cert'
+      register: opn_pre2
+      failed_when: >
+        opn_pre2.failed or
+        'data' not in opn_pre2
+
+    - name: Remembering the pre-existing entries
+      ansible.builtin.set_fact:
+        cas_pre: "{{ opn_pre1.data | length }}"
+        certs_pre: "{{ opn_pre2.data | length }}"
+
+    - name: Removing - does not exist
+      oxlorg.opnsense.trust_ca:
+        description: 'ANSIBLE_TEST_1_1'
+        state: 'absent'
+      register: opn_pre3
+      failed_when: >
+        opn_pre3.failed or
+        opn_pre3.changed
+
+    - name: Adding CA - failing because no certificate was provided
+      oxlorg.opnsense.trust_ca:
+        description: 'ANSIBLE_TEST_1_1'
+      register: opn_fail1
+      failed_when: not opn_fail1.failed
+
+    - name: Adding CA - failing because the certificate is not PEM
+      oxlorg.opnsense.trust_ca:
+        description: 'ANSIBLE_TEST_1_1'
+        certificate: 'not-a-certificate'
+      register: opn_fail2
+      failed_when: not opn_fail2.failed
+
+    - name: Adding CA - failing because the private-key is not PEM
+      oxlorg.opnsense.trust_ca:
+        description: 'ANSIBLE_TEST_1_1'
+        certificate: "{{ ca1.crt }}"
+        private_key: 'not-a-private-key'
+      register: opn_fail3
+      failed_when: not opn_fail3.failed
+
+    - name: Adding CA - failing because the private-key is passphrase-protected
+      oxlorg.opnsense.trust_ca:
+        description: 'ANSIBLE_TEST_1_1'
+        certificate: "{{ ca1.crt }}"
+        private_key: |
+          -----BEGIN ENCRYPTED PRIVATE KEY-----
+          MIHsMFcGCSqGSIb3DQEFDTBKMCkGCSqGSIb3DQEFDDAcBAgAAAAAAAAAAAICCAAw
+          DAYIKoZIhvcNAgkFADAdBglghkgBZQMEASoEEAAAAAAAAAAAAAAAAAAAAAA=
+          -----END ENCRYPTED PRIVATE KEY-----
+      register: opn_fail4
+      failed_when: not opn_fail4.failed
+
+    - name: Adding CA - failing because generating one is not supported
+      oxlorg.opnsense.trust_ca:
+        description: 'ANSIBLE_TEST_1_1'
+        certificate: "{{ ca1.crt }}"
+        action: 'internal'
+      register: opn_fail5
+      failed_when: not opn_fail5.failed
+
+    - name: Adding certificate - failing because re-issuing is not supported
+      oxlorg.opnsense.trust_cert:
+        description: 'ANSIBLE_TEST_2_1'
+        certificate: "{{ leaf1.crt }}"
+        action: 'reissue'
+      register: opn_fail6
+      failed_when: not opn_fail6.failed
+
+    - name: Adding certificate - failing because the key does not match (server-side)
+      oxlorg.opnsense.trust_cert:
+        description: 'ANSIBLE_TEST_2_1'
+        certificate: "{{ leaf1.crt }}"
+        private_key: "{{ leaf2.key }}"
+      register: opn_fail7
+      failed_when: not opn_fail7.failed
+      when: not ansible_check_mode
+
+    - name: Adding CA 1
+      oxlorg.opnsense.trust_ca:
+        description: 'ANSIBLE_TEST_1_1'
+        certificate: "{{ ca1.crt }}"
+        private_key: "{{ ca1.key }}"
+      register: opn1
+      failed_when: >
+        opn1.failed or
+        not opn1.changed
+
+    - name: Adding CA 1 - nothing changed
+      oxlorg.opnsense.trust_ca:
+        description: 'ANSIBLE_TEST_1_1'
+        certificate: "{{ ca1.crt }}"
+        private_key: "{{ ca1.key }}"
+      register: opn2
+      failed_when: >
+        opn2.failed or
+        opn2.changed
+      when: not ansible_check_mode
+
+    - name: Adding CA 2 - public part only
+      oxlorg.opnsense.trust_ca:
+        description: 'ANSIBLE_TEST_1_2'
+        certificate: "{{ ca2.crt }}"
+      register: opn3
+      failed_when: >
+        opn3.failed or
+        not opn3.changed
+
+    - name: Adding CA 2s private-key
+      oxlorg.opnsense.trust_ca:
+        description: 'ANSIBLE_TEST_1_2'
+        certificate: "{{ ca2.crt }}"
+        private_key: "{{ ca2.key }}"
+      register: opn3a
+      failed_when: >
+        opn3a.failed or
+        not opn3a.changed
+      when: not ansible_check_mode
+
+    - name: Adding CA 2s private-key - nothing changed
+      oxlorg.opnsense.trust_ca:
+        description: 'ANSIBLE_TEST_1_2'
+        certificate: "{{ ca2.crt }}"
+        private_key: "{{ ca2.key }}"
+      register: opn3b
+      failed_when: >
+        opn3b.failed or
+        opn3b.changed
+      when: not ansible_check_mode
+
+    - name: Adding certificate 1
+      oxlorg.opnsense.trust_cert:
+        description: 'ANSIBLE_TEST_2_1'
+        certificate: "{{ leaf1.crt }}"
+        private_key: "{{ leaf1.key }}"
+      register: opn4
+      failed_when: >
+        opn4.failed or
+        not opn4.changed
+
+    - name: Adding certificate 1 - nothing changed
+      oxlorg.opnsense.trust_cert:
+        description: 'ANSIBLE_TEST_2_1'
+        certificate: "{{ leaf1.crt }}"
+        private_key: "{{ leaf1.key }}"
+      register: opn5
+      failed_when: >
+        opn5.failed or
+        opn5.changed
+      when: not ansible_check_mode
+
+    - name: Adding certificate 1 - nothing changed without the private-key
+      oxlorg.opnsense.trust_cert:
+        description: 'ANSIBLE_TEST_2_1'
+        certificate: "{{ leaf1.crt }}"
+      register: opn6
+      failed_when: >
+        opn6.failed or
+        opn6.changed
+      when: not ansible_check_mode
+
+    - name: Listing authorities
+      oxlorg.opnsense.list:
+        target: 'trust_ca'
+      register: opn7
+      failed_when: >
+        opn7.failed or
+        'data' not in opn7 or
+        opn7.data | length != (cas_pre | int) + 2
+      when: not ansible_check_mode
+
+    - name: Remembering the authorities reference-id
+      ansible.builtin.set_fact:
+        ca1_refid: "{{ (opn7.data | selectattr('description', 'eq', 'ANSIBLE_TEST_1_1') | first).refid }}"
+      when: not ansible_check_mode
+
+    - name: Listing certificates
+      oxlorg.opnsense.list:
+        target: 'trust_cert'
+      register: opn8
+      failed_when: >
+        opn8.failed or
+        'data' not in opn8 or
+        opn8.data | length != (certs_pre | int) + 1
+      when: not ansible_check_mode
+
+    - name: Checking the certificate was linked to its authority
+      ansible.builtin.assert:
+        that:
+          - "(opn8.data | selectattr('description', 'eq', 'ANSIBLE_TEST_2_1') | first).caref == ca1_refid"
+        fail_msg: 'The imported certificate was not linked to the imported authority'
+      when: not ansible_check_mode
+
+    - name: Checking the listed private-keys are redacted
+      ansible.builtin.assert:
+        that:
+          - "(opn8.data | selectattr('description', 'eq', 'ANSIBLE_TEST_2_1') | first).private_key == 'VALUE_SPECIFIED_IN_NO_LOG_PARAMETER'"
+          - "(opn8.data | selectattr('description', 'eq', 'ANSIBLE_TEST_2_1') | first).prv == 'VALUE_SPECIFIED_IN_NO_LOG_PARAMETER'"
+        fail_msg: 'The listed entries leaked a private key'
+      when: not ansible_check_mode
+
+    - name: Replacing certificate 1 - certificate and matching key
+      oxlorg.opnsense.trust_cert:
+        description: 'ANSIBLE_TEST_2_1'
+        certificate: "{{ leaf2.crt }}"
+        private_key: "{{ leaf2.key }}"
+      register: opn9
+      failed_when: >
+        opn9.failed or
+        not opn9.changed
+      when: not ansible_check_mode
+
+    - name: Removing certificate 1s private-key
+      oxlorg.opnsense.trust_cert:
+        description: 'ANSIBLE_TEST_2_1'
+        certificate: "{{ leaf2.crt }}"
+        private_key: ''
+      register: opn10
+      failed_when: >
+        opn10.failed or
+        not opn10.changed
+      when: not ansible_check_mode
+
+    - name: Removing certificate 1s private-key - nothing changed
+      oxlorg.opnsense.trust_cert:
+        description: 'ANSIBLE_TEST_2_1'
+        certificate: "{{ leaf2.crt }}"
+        private_key: ''
+      register: opn11
+      failed_when: >
+        opn11.failed or
+        opn11.changed
+      when: not ansible_check_mode
+
+    - name: Removing CA 1 - failing because a certificate still references it
+      oxlorg.opnsense.trust_ca:
+        description: 'ANSIBLE_TEST_1_1'
+        state: 'absent'
+      register: opn12
+      failed_when: not opn12.failed
+      when: not ansible_check_mode
+
+    - name: Removing CA 1 - forced
+      oxlorg.opnsense.trust_ca:
+        description: 'ANSIBLE_TEST_1_1'
+        state: 'absent'
+        force: true
+      register: opn13
+      failed_when: >
+        opn13.failed or
+        not opn13.changed
+      when: not ansible_check_mode
+
+    - name: Cleanup certificates
+      oxlorg.opnsense.trust_cert:
+        description: "{{ item }}"
+        state: 'absent'
+        force: true
+      loop:
+        - 'ANSIBLE_TEST_2_1'
+      when: not ansible_check_mode
+
+    - name: Cleanup authorities
+      oxlorg.opnsense.trust_ca:
+        description: "{{ item }}"
+        state: 'absent'
+        force: true
+      loop:
+        - 'ANSIBLE_TEST_1_1'
+        - 'ANSIBLE_TEST_1_2'
+      when: not ansible_check_mode
+
+    - name: Listing authorities
+      oxlorg.opnsense.list:
+        target: 'trust_ca'
+      register: opn14
+      failed_when: >
+        opn14.failed or
+        'data' not in opn14 or
+        opn14.data | length != (cas_pre | int)
+      when: not ansible_check_mode
+
+    - name: Listing certificates
+      oxlorg.opnsense.list:
+        target: 'trust_cert'
+      register: opn15
+      failed_when: >
+        opn15.failed or
+        'data' not in opn15 or
+        opn15.data | length != (certs_pre | int)
+      when: not ansible_check_mode

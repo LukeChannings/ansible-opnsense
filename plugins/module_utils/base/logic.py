@@ -26,6 +26,7 @@ class BaseLogic:
     ATTR_TRANSLATE = 'FIELDS_TRANSLATE'
     ATTR_DIFF_EXCL = 'FIELDS_DIFF_EXCLUDE'
     ATTR_DIFF_NO_LOG = 'FIELDS_DIFF_NO_LOG'
+    ATTR_API_NO_LOG = 'FIELDS_API_NO_LOG'
     ATTR_VALUE_MAP = 'FIELDS_VALUE_MAPPING'
     ATTR_VALUE_MAP_RCV = 'FIELDS_VALUE_MAPPING_RCV'
     ATTR_FIELD_ALL = 'FIELDS_ALL'
@@ -100,6 +101,11 @@ class BaseLogic:
 
             if opn_field not in fields:
                 fields.append(opn_field)
+
+        for field in getattr(cls, cls.ATTR_API_NO_LOG, []):
+            # API-side fields the module does not map, but that carry the same secret
+            if field not in fields:
+                fields.append(field)
 
         return fields
 
