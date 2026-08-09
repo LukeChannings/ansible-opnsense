@@ -228,6 +228,8 @@ action_groups:
     - oxlorg.opnsense.tailscale_general
     - oxlorg.opnsense.tailscale_subnet
     - oxlorg.opnsense.tailscale_subnet_multi
+  netflow:
+    - oxlorg.opnsense.netflow
   all:
     - metadata:
         extend_group:
@@ -267,6 +269,7 @@ action_groups:
           - oxlorg.opnsense.nodeexporter
           - oxlorg.opnsense.crowdsec
           - oxlorg.opnsense.tailscale
+          - oxlorg.opnsense.netflow
 
 plugin_routing:
   modules:

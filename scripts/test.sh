@@ -276,6 +276,7 @@ run_test_soft 'crowdsec_general' 1
 run_test_soft 'tailscale_general' 1
 run_test_soft 'tailscale_subnet' 1
 run_test_soft 'tailscale_subnet_multi' 1
+run_test_soft 'netflow' 1
 
 run_test_soft '1_cleanup' 0
 run_test_soft '1_reload' 0

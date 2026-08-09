@@ -1,0 +1,248 @@
+---
+- name: Testing NetFlow
+  hosts: localhost
+  gather_facts: no
+  module_defaults:
+    group/oxlorg.opnsense.all:
+      firewall: "{{ lookup('ansible.builtin.env', 'TEST_FIREWALL') }}"
+      api_credential_file: "{{ lookup('ansible.builtin.env', 'TEST_API_KEY') }}"
+      ssl_verify: false
+
+    oxlorg.opnsense.list:
+      target: 'netflow'
+
+  environment:
+    HTTPS_PROXY: "{{ lookup('ansible.builtin.env', 'TEST_PROXY') | default('') }}"
+
+  tasks:
+    - name: Listing
+      oxlorg.opnsense.list:
+      register: opn_pre1
+      failed_when: >
+        opn_pre1.failed or
+        'data' not in opn_pre1 or
+        opn_pre1.data | length == 0
+
+    - name: Configuring - failing because a target has no port
+      oxlorg.opnsense.netflow:
+        targets: ['192.168.1.50']
+      register: opn_fail1
+      failed_when: not opn_fail1.failed
+
+    - name: Configuring - failing because a target is not an IP-Address
+      oxlorg.opnsense.netflow:
+        targets: ['collector.example.com:2055']
+      register: opn_fail2
+      failed_when: not opn_fail2.failed
+
+    - name: Configuring - failing because an IPv6-target is not bracketed
+      oxlorg.opnsense.netflow:
+        targets: ['fd00::50:2055']
+      register: opn_fail3
+      failed_when: not opn_fail3.failed
+
+    - name: Configuring - failing because an egress-only interface is not captured
+      oxlorg.opnsense.netflow:
+        interfaces: ['lan']
+        egress_only: ['wan']
+      register: opn_fail4
+      failed_when: not opn_fail4.failed
+
+    - name: Configuring - failing because of an invalid active-timeout
+      oxlorg.opnsense.netflow:
+        interfaces: ['lan']
+        targets: ['192.168.1.50:2055']
+        active_timeout: 0
+      register: opn_fail5
+      failed_when: not opn_fail5.failed
+
+    - name: Configuring - failing because of an invalid inactive-timeout
+      oxlorg.opnsense.netflow:
+        interfaces: ['lan']
+        targets: ['192.168.1.50:2055']
+        inactive_timeout: 86401
+      register: opn_fail6
+      failed_when: not opn_fail6.failed
+
+    - name: Configuring - failing because an enabled capture has no interfaces
+      oxlorg.opnsense.netflow:
+        targets: ['192.168.1.50:2055']
+      register: opn_fail7
+      failed_when: not opn_fail7.failed
+
+    - name: Configuring - failing because an enabled capture has no targets
+      oxlorg.opnsense.netflow:
+        interfaces: ['lan']
+      register: opn_fail8
+      failed_when: not opn_fail8.failed
+
+    - name: Configuring - exporting to two external collectors
+      oxlorg.opnsense.netflow:
+        interfaces: ['lan', 'wan']
+        egress_only: ['wan']
+        version: 'v5'
+        targets: ['192.168.1.50:2055', '[fd00::50]:2055']
+        active_timeout: 60
+        inactive_timeout: 5
+      register: opn1
+      failed_when: >
+        opn1.failed or
+        not opn1.changed
+
+    - name: Configuring - nothing changed
+      oxlorg.opnsense.netflow:
+        interfaces: ['lan', 'wan']
+        egress_only: ['wan']
+        version: 'v5'
+        targets: ['192.168.1.50:2055', '[fd00::50]:2055']
+        active_timeout: 60
+        inactive_timeout: 5
+      register: opn2
+      failed_when: >
+        opn2.failed or
+        opn2.changed
+      when: not ansible_check_mode
+
+    - name: Listing - the nested settings were written with their expected types
+      oxlorg.opnsense.list:
+      register: opn3
+      failed_when: >
+        opn3.failed or
+        opn3.data.interfaces != ['lan', 'wan'] or
+        opn3.data.egress_only != ['wan'] or
+        opn3.data.version != 'v5' or
+        opn3.data.targets != ['192.168.1.50:2055', '[fd00::50]:2055'] or
+        opn3.data.capture_local is not false or
+        opn3.data.active_timeout != 60 or
+        opn3.data.inactive_timeout != 5 or
+        opn3.data.enabled is not true
+      when: not ansible_check_mode
+
+    - name: Listing - the raw model-containers are not part of the settings-object
+      ansible.builtin.assert:
+        that:
+          - "'capture' not in opn3.data"
+          - "'collect' not in opn3.data"
+      when: not ansible_check_mode
+
+    - name: Configuring - enabling the local collector
+      oxlorg.opnsense.netflow:
+        interfaces: ['lan', 'wan']
+        egress_only: ['wan']
+        version: 'v5'
+        targets: ['192.168.1.50:2055', '[fd00::50]:2055']
+        capture_local: true
+        active_timeout: 60
+        inactive_timeout: 5
+      register: opn4
+      failed_when: >
+        opn4.failed or
+        not opn4.changed
+      when: not ansible_check_mode
+
+    - name: Configuring - nothing changed even though OPNsense added the local target
+      oxlorg.opnsense.netflow:
+        interfaces: ['lan', 'wan']
+        egress_only: ['wan']
+        version: 'v5'
+        targets: ['192.168.1.50:2055', '[fd00::50]:2055']
+        capture_local: true
+        active_timeout: 60
+        inactive_timeout: 5
+      register: opn5
+      failed_when: >
+        opn5.failed or
+        opn5.changed
+      when: not ansible_check_mode
+
+    - name: Listing - the local collector was added to the targets
+      oxlorg.opnsense.list:
+      register: opn6
+      failed_when: >
+        opn6.failed or
+        opn6.data.capture_local is not true or
+        '127.0.0.1:2056' not in opn6.data.targets
+      when: not ansible_check_mode
+
+    - name: Configuring - pausing the capture
+      oxlorg.opnsense.netflow:
+        enabled: false
+        interfaces: ['lan', 'wan']
+        egress_only: ['wan']
+        version: 'v5'
+        targets: ['192.168.1.50:2055', '[fd00::50]:2055']
+        capture_local: true
+        active_timeout: 60
+        inactive_timeout: 5
+      register: opn7
+      failed_when: >
+        opn7.failed or
+        not opn7.changed
+      when: not ansible_check_mode
+
+    - name: Listing - only the interface-pair was cleared
+      oxlorg.opnsense.list:
+      register: opn8
+      failed_when: >
+        opn8.failed or
+        opn8.data.enabled is not false or
+        opn8.data.interfaces != [] or
+        opn8.data.egress_only != [] or
+        opn8.data.version != 'v5' or
+        '192.168.1.50:2055' not in opn8.data.targets or
+        opn8.data.capture_local is not true or
+        opn8.data.active_timeout != 60 or
+        opn8.data.inactive_timeout != 5
+      when: not ansible_check_mode
+
+    - name: Configuring - resuming the capture
+      oxlorg.opnsense.netflow:
+        interfaces: ['lan', 'wan']
+        egress_only: ['wan']
+        version: 'v5'
+        targets: ['192.168.1.50:2055', '[fd00::50]:2055']
+        capture_local: true
+        active_timeout: 60
+        inactive_timeout: 5
+      register: opn9
+      failed_when: >
+        opn9.failed or
+        not opn9.changed
+      when: not ansible_check_mode
+
+    - name: Listing - the capture is back on
+      oxlorg.opnsense.list:
+      register: opn10
+      failed_when: >
+        opn10.failed or
+        opn10.data.enabled is not true or
+        opn10.data.interfaces != ['lan', 'wan'] or
+        opn10.data.egress_only != ['wan']
+      when: not ansible_check_mode
+
+    - name: Configuring - omitted fields fall back to their defaults
+      oxlorg.opnsense.netflow:
+        interfaces: ['lan']
+        targets: ['192.168.1.50:2055']
+      register: opn11
+      failed_when: >
+        opn11.failed or
+        not opn11.changed
+      when: not ansible_check_mode
+
+    - name: Listing - the defaults were applied
+      oxlorg.opnsense.list:
+      register: opn12
+      failed_when: >
+        opn12.failed or
+        opn12.data.egress_only != [] or
+        opn12.data.version != 'v9' or
+        opn12.data.capture_local is not false or
+        opn12.data.active_timeout != 1800 or
+        opn12.data.inactive_timeout != 15
+      when: not ansible_check_mode
+
+    - name: Cleanup
+      oxlorg.opnsense.netflow:
+        enabled: false
+        reload: true
