@@ -254,6 +254,7 @@ not implemented => development => [testing](https://github.com/O-X-L/ansible-opn
 | **CrowdSec**              | oxlorg.opnsense.crowdsec_general                               | [Docs](https://ansible-opnsense.oxl.app/modules/crowdsec.html)                                                  | unstable |
 | **Tailscale**             | oxlorg.opnsense.tailscale_general                              | [Docs](https://ansible-opnsense.oxl.app/modules/tailscale.html)                                                 | unstable |
 | **Tailscale**             | oxlorg.opnsense.tailscale_subnet                               | [Docs](https://ansible-opnsense.oxl.app/modules/tailscale.html)                                                 | unstable |
+| **NetFlow**               | oxlorg.opnsense.netflow                                        | [Docs](https://ansible-opnsense.oxl.app/modules/netflow.html)                                                   | unstable |
 
 ### Roadmap
 

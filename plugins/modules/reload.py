@@ -62,6 +62,7 @@ def run_module():
                 'nodeexporter',
                 'crowdsec',
                 'tailscale',
+                'netflow',
             ],
             description='What part of the running config should be reloaded'
         ),
@@ -220,6 +221,10 @@ def run_module():
 
         elif target == 'tailscale':
             from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.tailscale_general import \
+                General as Target_Obj
+
+        elif target == 'netflow':
+            from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.netflow import \
                 General as Target_Obj
 
     except MODULE_EXCEPTIONS:
