@@ -1,0 +1,127 @@
+---
+
+- name: Testing interface assignments
+  hosts: localhost
+  gather_facts: no
+  module_defaults:
+    group/oxlorg.opnsense.all:
+      firewall: "{{ lookup('ansible.builtin.env', 'TEST_FIREWALL') }}"
+      api_credential_file: "{{ lookup('ansible.builtin.env', 'TEST_API_KEY') }}"
+      ssl_verify: false
+
+    oxlorg.opnsense.list:
+      target: 'interface_assignment'
+
+  environment:
+    HTTPS_PROXY: "{{ lookup('ansible.builtin.env', 'TEST_PROXY') | default('') }}"
+
+  tasks:
+    - name: Listing - a firewall always has assignments
+      oxlorg.opnsense.list:
+      register: opn_pre1
+      failed_when: >
+        opn_pre1.failed or
+        'data' not in opn_pre1 or
+        opn_pre1.data | length == 0
+
+    - name: Removing - does not exist
+      oxlorg.opnsense.interface_assignment:
+        description: 'ANSIBLE_TEST_ASSIGN_1'
+        match_fields: ['description']
+        state: 'absent'
+      register: opn_pre2
+      failed_when: >
+        opn_pre2.failed or
+        opn_pre2.changed
+
+    - name: Failing - no device provided
+      oxlorg.opnsense.interface_assignment:
+        description: 'ANSIBLE_TEST_ASSIGN_1'
+        match_fields: ['description']
+      register: opn_fail1
+      failed_when: not opn_fail1.failed
+
+    - name: Failing - match-field without a value
+      oxlorg.opnsense.interface_assignment:
+        device: 'vlan0.99'
+        match_fields: ['description']
+      register: opn_fail2
+      failed_when: not opn_fail2.failed
+
+    - name: Failing - a new assignment cannot be matched on its identifier
+      oxlorg.opnsense.interface_assignment:
+        identifier: 'opt99'
+        device: 'vlan0.99'
+      register: opn_fail3
+      failed_when: not opn_fail3.failed
+      when: not ansible_check_mode
+
+    - name: Adding test vlan-device
+      oxlorg.opnsense.interface_vlan:
+        description: 'ANSIBLE_TEST_ASSIGN_VLAN'
+        interface: 'vtnet0'
+        vlan: 99
+      when: not ansible_check_mode
+
+    - name: Adding 1
+      oxlorg.opnsense.interface_assignment:
+        description: 'ANSIBLE_TEST_ASSIGN_1'
+        device: 'vlan0.99'
+        match_fields: ['description']
+      register: opn1
+      failed_when: >
+        opn1.failed or
+        not opn1.changed
+      when: not ansible_check_mode
+
+    - name: Adding 1 - nothing changed
+      oxlorg.opnsense.interface_assignment:
+        description: 'ANSIBLE_TEST_ASSIGN_1'
+        device: 'vlan0.99'
+        match_fields: ['description']
+      register: opn2
+      failed_when: >
+        opn2.failed or
+        opn2.changed
+      when: not ansible_check_mode
+
+    - name: Changing 1 - locking
+      oxlorg.opnsense.interface_assignment:
+        description: 'ANSIBLE_TEST_ASSIGN_1'
+        device: 'vlan0.99'
+        lock: true
+        match_fields: ['description']
+      register: opn3
+      failed_when: >
+        opn3.failed or
+        not opn3.changed
+      when: not ansible_check_mode
+
+    - name: Changing 1 - matched on the allocated identifier
+      oxlorg.opnsense.interface_assignment:
+        identifier: "{{ opn3.diff.after.uuid }}"
+        description: 'ANSIBLE_TEST_ASSIGN_1'
+        device: 'vlan0.99'
+        lock: true
+      register: opn4
+      failed_when: >
+        opn4.failed or
+        opn4.changed
+      when: not ansible_check_mode
+
+    - name: Removing 1
+      oxlorg.opnsense.interface_assignment:
+        description: 'ANSIBLE_TEST_ASSIGN_1'
+        match_fields: ['description']
+        state: 'absent'
+      register: opn5
+      failed_when: >
+        opn5.failed or
+        not opn5.changed
+      when: not ansible_check_mode
+
+    - name: Removing test vlan-device
+      oxlorg.opnsense.interface_vlan:
+        description: 'ANSIBLE_TEST_ASSIGN_VLAN'
+        state: 'absent'
+      when: not ansible_check_mode

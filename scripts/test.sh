@@ -268,6 +268,7 @@ run_test_soft 'tailscale_general' 1
 run_test_soft 'tailscale_subnet' 1
 run_test_soft 'netflow' 1
 run_test_soft 'trust' 1
+run_test_soft 'interface_assignment' 1
 
 run_test_soft '1_cleanup' 0
 run_test_soft '1_reload' 0

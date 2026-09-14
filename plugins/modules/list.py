@@ -53,6 +53,7 @@ TARGETS = [
     'haproxy_resolver', 'haproxy_backend', 'haproxy_frontend', 'haproxy_healthcheck', 'haproxy_server',
     'wazuh_agent', 'nut', 'udpbroadcastrelay', 'nodeexporter', 'crowdsec_general',
     'tailscale_general', 'tailscale_subnet', 'netflow', 'trust_ca', 'trust_cert',
+    'interface_assignment',
 ]
 
 
@@ -718,6 +719,10 @@ def run_module():
         elif target == 'trust_cert':
             from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.trust_cert import \
                 Cert as Target_Obj
+
+        elif target == 'interface_assignment':
+            from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.interface_assignment import \
+                Assignment as Target_Obj
 
     except AttributeError:
         module_dependency_error()

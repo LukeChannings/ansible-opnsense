@@ -1267,6 +1267,21 @@
         - '192.168.69.0/24'
         - 'fd00:69::/64'
 
+    - name: Cleanup interface assignments
+      oxlorg.opnsense.interface_assignment:
+        description: "{{ item }}"
+        match_fields: ['description']
+        state: 'absent'
+      loop:
+        - 'ANSIBLE_TEST_ASSIGN_1'
+
+    - name: Cleanup interface assignment vlan-devices
+      oxlorg.opnsense.interface_vlan:
+        description: "{{ item }}"
+        state: 'absent'
+      loop:
+        - 'ANSIBLE_TEST_ASSIGN_VLAN'
+
     - name: Cleanup certificates
       oxlorg.opnsense.trust_cert:
         description: "{{ item }}"
