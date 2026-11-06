@@ -443,6 +443,34 @@
         - 'opt1'
         - 'lan'
 
+    - name: Cleanup OSPF interfaces
+      oxlorg.opnsense.frr_ospf_interface:
+        interface: "{{ item }}"
+        state: 'absent'
+        match_fields: ['interface']
+      loop:
+        - 'opt1'
+        - 'lan'
+
+    # areas have to go after the interfaces that reference them
+    - name: Cleanup OSPF areas
+      oxlorg.opnsense.frr_ospf_area:
+        area: "{{ item }}"
+        state: 'absent'
+      loop:
+        - '0.0.0.0'
+        - '0.0.0.1'
+        - '0.0.0.2'
+
+    - name: Cleanup OSPFv3 areas
+      oxlorg.opnsense.frr_ospf3_area:
+        area: "{{ item }}"
+        state: 'absent'
+      loop:
+        - '0.0.0.0'
+        - '0.0.0.1'
+        - '0.0.0.2'
+
     - name: Cleanup OSPF route-maps
       oxlorg.opnsense.frr_ospf_route_map:
         name: "{{ item }}"
@@ -491,6 +519,8 @@
         - 'ANSIBLE_TEST_1_2'
         - 'ANSIBLE_TEST_2_1'
         - 'ANSIBLE_TEST_3_1'
+        - 'ANSIBLE_TEST_AREA_IN'
+        - 'ANSIBLE_TEST_AREA_OUT'
 
     - name: Cleanup OSPFv3 prefix-lists
       oxlorg.opnsense.frr_ospf3_prefix_list:
@@ -501,6 +531,8 @@
         - 'ANSIBLE_TEST_1_2'
         - 'ANSIBLE_TEST_2_1'
         - 'ANSIBLE_TEST_3_1'
+        - 'ANSIBLE_TEST_AREA_IN'
+        - 'ANSIBLE_TEST_AREA_OUT'
 
     - name: Cleanup FRR OSPF redistributions
       oxlorg.opnsense.frr_ospf_redistribution:

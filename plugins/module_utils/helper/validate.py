@@ -4,8 +4,8 @@ from re import compile as regex_compile
 from re import IGNORECASE as REGEX_IGNORECASE
 from re import UNICODE as REGEX_UNICODE
 from socket import getservbyname
-from ipaddress import ip_address, ip_network, IPv4Address, IPv6Address, IPv6Network, AddressValueError, \
-    NetmaskValueError
+from ipaddress import ip_address, ip_network, IPv4Address, IPv6Address, IPv4Network, IPv6Network, \
+    AddressValueError, NetmaskValueError
 
 from ansible.module_utils.basic import AnsibleModule
 
@@ -318,6 +318,14 @@ def is_ip_or_network(entry: str, strict: bool = False) -> bool:
         return valid
 
     return is_network(entry=entry, strict=strict)
+
+
+def is_ip4_network(entry: str, strict: bool = False) -> bool:
+    try:
+        return isinstance(ip_network(entry, strict=strict), IPv4Network)
+
+    except ValueError:
+        return False
 
 
 def is_ip6_network(entry: str, strict: bool = False) -> bool:

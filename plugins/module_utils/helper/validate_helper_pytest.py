@@ -73,6 +73,21 @@ def test_is_network(value, result):
 
     assert is_network(value, strict=True) == result
 
+@pytest.mark.parametrize('value, is_v4, is_v6', [
+    ('10.0.1.0/24', True, False),
+    ('10.0.1.1', True, False),
+    ('2001:db8:1::/48', False, True),
+    ('2001:db8:1::1', False, True),
+    ('not-a-network', False, False),
+    ('10.0.1.0/33', False, False),
+])
+def test_network_family_discrimination(value, is_v4, is_v6):
+    from ansible_collections.oxlorg.opnsense.plugins.module_utils.helper.validate import \
+        is_ip4_network, is_ip6_network
+
+    assert is_ip4_network(value) == is_v4
+    assert is_ip6_network(value) == is_v6
+
 @pytest.mark.parametrize('value, result', [
     ('1.2.3.4-1.2.3.6', True),
     ('!1.2.3.4-1.2.3.6', False),
@@ -159,4 +174,4 @@ def test_validate_port_or_range(value, valid, params):
 def test_placeholder():
     from ansible_collections.oxlorg.opnsense.plugins.module_utils.helper.validate import \
         is_valid_domain, is_valid_email, is_valid_url, validate_int_fields, validate_str_fields, \
-        is_ip4, is_ip6, is_ip_or_network, is_ip6_network, valid_hostname
+        is_ip4, is_ip6, is_ip_or_network, is_ip4_network, is_ip6_network, valid_hostname
