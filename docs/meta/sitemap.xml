@@ -64,4 +64,9 @@
    <url><loc>https://ansible-opnsense.oxl.app/modules/nut.html</loc></url>
    <url><loc>https://ansible-opnsense.oxl.app/modules/nut_diagnostics.html</loc></url>
    <url><loc>https://ansible-opnsense.oxl.app/modules/trust.html</loc></url>
+   <url><loc>https://ansible-opnsense.oxl.app/modules/udpbroadcastrelay.html</loc></url>
+   <url><loc>https://ansible-opnsense.oxl.app/modules/nodeexporter.html</loc></url>
+   <url><loc>https://ansible-opnsense.oxl.app/modules/crowdsec.html</loc></url>
+   <url><loc>https://ansible-opnsense.oxl.app/modules/tailscale.html</loc></url>
+   <url><loc>https://ansible-opnsense.oxl.app/modules/netflow.html</loc></url>
 </urlset>

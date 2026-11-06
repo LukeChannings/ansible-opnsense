@@ -1,0 +1,121 @@
+---
+- name: Testing Tailscale General
+  hosts: localhost
+  gather_facts: no
+  module_defaults:
+    group/oxlorg.opnsense.all:
+      firewall: "{{ lookup('ansible.builtin.env', 'TEST_FIREWALL') }}"
+      api_credential_file: "{{ lookup('ansible.builtin.env', 'TEST_API_KEY') }}"
+      ssl_verify: false
+
+    oxlorg.opnsense.list:
+      target: 'tailscale_general'
+
+  environment:
+    HTTPS_PROXY: "{{ lookup('ansible.builtin.env', 'TEST_PROXY') | default('') }}"
+
+  tasks:
+    - name: Listing
+      oxlorg.opnsense.list:
+      register: opn_pre1
+      failed_when: >
+        opn_pre1.failed or
+        'data' not in opn_pre1 or
+        opn_pre1.data | length == 0
+
+    - name: Configuring - failing because of an invalid listen-port
+      oxlorg.opnsense.tailscale_general:
+        listen_port: 65536
+      register: opn_fail1
+      failed_when: not opn_fail1.failed
+
+    - name: Configuring - failing because of an invalid login-timeout
+      oxlorg.opnsense.tailscale_general:
+        login_timeout: 0
+      register: opn_fail2
+      failed_when: not opn_fail2.failed
+
+    - name: Configuring - failing because the exit-node is not offered by the tailnet
+      oxlorg.opnsense.tailscale_general:
+        use_exit_node: 'no-such-peer'
+      register: opn_fail3
+      failed_when: not opn_fail3.failed
+
+    - name: Configuring - a subnet-router that keeps its own resolver
+      oxlorg.opnsense.tailscale_general:
+        enabled: true
+        login_timeout: 30
+        listen_port: 41642
+        accept_dns: false
+        advertise_exit_node: true
+        accept_subnet_routes: true
+        enable_ssh: true
+        disable_snat: true
+      register: opn1
+      failed_when: >
+        opn1.failed or
+        not opn1.changed
+
+    - name: Configuring - nothing changed
+      oxlorg.opnsense.tailscale_general:
+        enabled: true
+        login_timeout: 30
+        listen_port: 41642
+        accept_dns: false
+        advertise_exit_node: true
+        accept_subnet_routes: true
+        enable_ssh: true
+        disable_snat: true
+      register: opn2
+      failed_when: >
+        opn2.failed or
+        opn2.changed
+      when: not ansible_check_mode
+
+    - name: Listing - the settings were written with their expected types
+      oxlorg.opnsense.list:
+      register: opn3
+      failed_when: >
+        opn3.failed or
+        opn3.data.enabled is not true or
+        opn3.data.login_timeout != 30 or
+        opn3.data.listen_port != 41642 or
+        opn3.data.accept_dns is not false or
+        opn3.data.advertise_exit_node is not true or
+        opn3.data.accept_subnet_routes is not true or
+        opn3.data.enable_ssh is not true or
+        opn3.data.disable_snat is not true or
+        opn3.data.use_exit_node != ''
+      when: not ansible_check_mode
+
+    - name: Listing - the advertised subnets are not part of the settings-object
+      ansible.builtin.assert:
+        that:
+          - "'subnets' not in opn3.data"
+      when: not ansible_check_mode
+
+    - name: Configuring - omitted fields fall back to their defaults
+      oxlorg.opnsense.tailscale_general:
+        enabled: true
+      register: opn4
+      failed_when: >
+        opn4.failed or
+        not opn4.changed
+      when: not ansible_check_mode
+
+    - name: Listing - the defaults were applied
+      oxlorg.opnsense.list:
+      register: opn5
+      failed_when: >
+        opn5.failed or
+        opn5.data.login_timeout != 10 or
+        opn5.data.listen_port != 41641 or
+        opn5.data.accept_dns is not true or
+        opn5.data.advertise_exit_node is not false or
+        opn5.data.accept_subnet_routes is not false or
+        opn5.data.enable_ssh is not false or
+        opn5.data.disable_snat is not false
+      when: not ansible_check_mode
+
+    - name: Cleanup
+      oxlorg.opnsense.tailscale_general:

@@ -1,0 +1,176 @@
+---
+- name: Testing CrowdSec General
+  hosts: localhost
+  gather_facts: no
+  module_defaults:
+    group/oxlorg.opnsense.all:
+      firewall: "{{ lookup('ansible.builtin.env', 'TEST_FIREWALL') }}"
+      api_credential_file: "{{ lookup('ansible.builtin.env', 'TEST_API_KEY') }}"
+      ssl_verify: false
+
+    oxlorg.opnsense.list:
+      target: 'crowdsec_general'
+
+  environment:
+    HTTPS_PROXY: "{{ lookup('ansible.builtin.env', 'TEST_PROXY') | default('') }}"
+
+  vars:
+    # not a real enrollment-key; never reaches the CrowdSec console as the tests
+    # do not reload/reconfigure
+    test_enroll_key: 'ansibletestenrollkey1'
+    test_enroll_key_rotated: 'ansibletestenrollkey2'
+
+  tasks:
+    - name: Listing
+      oxlorg.opnsense.list:
+      register: opn_pre1
+      failed_when: >
+        opn_pre1.failed or
+        'data' not in opn_pre1 or
+        opn_pre1.data | length == 0
+
+    - name: Configuring - failing because of an invalid local-API listen-address
+      oxlorg.opnsense.crowdsec_general:
+        lapi_listen_address: 'not-an-ip'
+      register: opn_fail1
+      failed_when: not opn_fail1.failed
+
+    - name: Configuring - failing because of an invalid local-API listen-port
+      oxlorg.opnsense.crowdsec_general:
+        lapi_listen_port: 65536
+      register: opn_fail2
+      failed_when: not opn_fail2.failed
+
+    - name: Configuring - failing because of an invalid rules-tag
+      oxlorg.opnsense.crowdsec_general:
+        rules_tag: 'not a valid tag'
+      register: opn_fail3
+      failed_when: not opn_fail3.failed
+
+    - name: Configuring - failing because of an invalid enrollment-key
+      oxlorg.opnsense.crowdsec_general:
+        enroll_key: 'not-a-valid-key'
+      register: opn_fail4
+      failed_when: not opn_fail4.failed
+
+    - name: Configuring - a logging, tagged setup on a non-default local-API socket
+      oxlorg.opnsense.crowdsec_general:
+        agent_enabled: true
+        lapi_enabled: true
+        firewall_bouncer_enabled: true
+        lapi_listen_address: '127.0.0.1'
+        lapi_listen_port: 18080
+        rules_log: true
+        rules_tag: 'ansibletest'
+        enroll_key: "{{ test_enroll_key }}"
+      register: opn1
+      failed_when: >
+        opn1.failed or
+        not opn1.changed
+
+    - name: Configuring - nothing changed
+      oxlorg.opnsense.crowdsec_general:
+        agent_enabled: true
+        lapi_enabled: true
+        firewall_bouncer_enabled: true
+        lapi_listen_address: '127.0.0.1'
+        lapi_listen_port: 18080
+        rules_log: true
+        rules_tag: 'ansibletest'
+        enroll_key: "{{ test_enroll_key }}"
+      register: opn2
+      failed_when: >
+        opn2.failed or
+        opn2.changed
+      when: not ansible_check_mode
+
+    - name: Listing - the settings were written with their expected types
+      oxlorg.opnsense.list:
+      register: opn3
+      failed_when: >
+        opn3.failed or
+        opn3.data.lapi_listen_address != '127.0.0.1' or
+        opn3.data.lapi_listen_port != 18080 or
+        opn3.data.agent_enabled is not true or
+        opn3.data.lapi_enabled is not true or
+        opn3.data.firewall_bouncer_enabled is not true or
+        opn3.data.lapi_manual_configuration is not false or
+        opn3.data.rules_enabled is not true or
+        opn3.data.rules_log is not true or
+        opn3.data.crowdsec_firewall_verbose is not false or
+        opn3.data.rules_tag != 'ansibletest'
+      when: not ansible_check_mode
+
+    - name: Configuring - an omitted enrollment-key is kept
+      oxlorg.opnsense.crowdsec_general:
+        lapi_listen_address: '127.0.0.1'
+        lapi_listen_port: 18080
+        rules_log: true
+        rules_tag: 'ansibletest'
+      register: opn4
+      failed_when: >
+        opn4.failed or
+        opn4.changed
+      when: not ansible_check_mode
+
+    - name: Listing - the enrollment-key survived
+      oxlorg.opnsense.list:
+      register: opn5
+      failed_when: >
+        opn5.failed or
+        opn5.data.enroll_key != test_enroll_key
+      when: not ansible_check_mode
+
+    - name: Configuring - rotating only the enrollment-key is a change
+      oxlorg.opnsense.crowdsec_general:
+        lapi_listen_address: '127.0.0.1'
+        lapi_listen_port: 18080
+        rules_log: true
+        rules_tag: 'ansibletest'
+        enroll_key: "{{ test_enroll_key_rotated }}"
+        debug: true
+      register: opn6
+      failed_when: >
+        opn6.failed or
+        not opn6.changed
+      when: not ansible_check_mode
+
+    - name: Verifying - the debug-run did not leak the enrollment-key
+      ansible.builtin.assert:
+        that:
+          - test_enroll_key not in (opn6 | to_json)
+          - test_enroll_key_rotated not in (opn6 | to_json)
+          - opn6.diff.before.enroll_key == 'VALUE_SPECIFIED_IN_NO_LOG_PARAMETER'
+          - opn6.diff.after.enroll_key == 'VALUE_SPECIFIED_IN_NO_LOG_PARAMETER'
+      when: not ansible_check_mode
+
+    - name: Configuring - clearing the enrollment-key
+      oxlorg.opnsense.crowdsec_general:
+        lapi_listen_address: '127.0.0.1'
+        lapi_listen_port: 18080
+        rules_log: true
+        rules_tag: 'ansibletest'
+        enroll_key: ''
+      register: opn7
+      failed_when: >
+        opn7.failed or
+        not opn7.changed
+      when: not ansible_check_mode
+
+    - name: Listing - omitted fields fell back to their defaults
+      oxlorg.opnsense.list:
+      register: opn8
+      failed_when: >
+        opn8.failed or
+        opn8.data.enroll_key != '' or
+        opn8.data.agent_enabled is not true or
+        opn8.data.lapi_enabled is not true or
+        opn8.data.firewall_bouncer_enabled is not true
+      when: not ansible_check_mode
+
+    - name: Cleanup
+      oxlorg.opnsense.crowdsec_general:
+        agent_enabled: false
+        lapi_enabled: false
+        firewall_bouncer_enabled: false
+        enroll_key: ''

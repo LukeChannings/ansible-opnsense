@@ -147,3 +147,50 @@ def test_check_response_failure_omits_request_body(http_client: str):
 
     assert 'SUPERSECRET' not in str(err.value)
     assert '400' in str(err.value) and 'failed' in str(err.value)
+
+
+def test_redact_data_masks_no_log_fields_at_any_depth():
+    from ansible_collections.oxlorg.opnsense.plugins.module_utils.helper.api import \
+        _redact_data, VALUE_NO_LOG
+
+    assert _redact_data(
+        {'general': {'enroll_key': 'supersecret', 'rules_tag': 'crowdsec'}},
+        ['enroll_key'],
+    ) == {'general': {'enroll_key': VALUE_NO_LOG, 'rules_tag': 'crowdsec'}}
+
+
+def test_redact_data_leaves_unlisted_fields_alone():
+    from ansible_collections.oxlorg.opnsense.plugins.module_utils.helper.api import _redact_data
+
+    data = {'general': {'enroll_key': 'supersecret'}}
+    assert _redact_data(data, []) == data
+
+
+def test_redact_content_masks_no_log_fields_in_a_response_body():
+    from ansible_collections.oxlorg.opnsense.plugins.module_utils.helper.api import \
+        _redact_content, VALUE_NO_LOG
+
+    assert _redact_content(
+        b'{"general":{"enroll_key":"supersecret","rules_tag":"crowdsec"}}',
+        ['enroll_key'],
+    ) == b'{"general":{"enroll_key":"' + VALUE_NO_LOG.encode() + b'","rules_tag":"crowdsec"}}'
+
+
+@pytest.mark.parametrize('http_client', ['httpx', 'requests'])
+def test_sanitize_response_for_logging_masks_no_log_fields(http_client: str):
+    from ansible_collections.oxlorg.opnsense.plugins.module_utils.helper.api import \
+        _sanitize_response_for_logging, VALUE_NO_LOG
+
+    sanitized = _sanitize_response_for_logging(
+        http_client_lib=http_client,
+        response_raw={
+            'status_code': 200,
+            '_content': b'{"general":{"enroll_key":"supersecret"}}',
+            'headers': {},
+        },
+        no_log_fields=['enroll_key'],
+    )
+
+    assert b'supersecret' not in sanitized['body']
+    assert VALUE_NO_LOG.encode() in sanitized['body']
+    assert 'headers' not in sanitized

@@ -38,11 +38,16 @@ class BaseTrust(BaseModule):
                 module=self.m,
                 existing=self.entry,
                 params=self.p,
-                fields=self.FIELDS_IMMUTABLE,
+                fields=self._immutable_fields(),
                 kind=self.KIND,
             )
 
         self._check_ambiguous()
+
+    def _immutable_fields(self) -> list:
+        # overridable: fields that were not used to build the entry must not be
+        # compared against what the API parsed out of it
+        return self.FIELDS_IMMUTABLE
 
     def _check_ambiguous(self) -> None:
         if not self.exists:

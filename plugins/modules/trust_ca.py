@@ -38,6 +38,18 @@ def run_module():
             description='Description or reference-id of an existing CA that should sign this one. '
                         'Leave empty to create a self-signed root CA.',
         ),
+        certificate=dict(
+            type='str', required=False, aliases=['crt', 'cert'],
+            description='PEM-encoded certificate of an existing CA to import, instead of having '
+                        'OPNsense generate one. The subject, key-type, digest and validity are '
+                        'read from it, so the generation-parameters below are ignored.',
+        ),
+        private_key=dict(
+            type='str', required=False, no_log=True, aliases=['key', 'prv'],
+            description='PEM-encoded private key belonging to the imported certificate. Only needed '
+                        'if the CA should be able to sign - omit it to import trust-only. Omitting '
+                        'it never removes a key the firewall already holds.',
+        ),
         key_type=dict(
             type='str', required=False, default='prime256v1', choices=TRUST_KEY_TYPES,
             description='Key size (RSA) or elliptic curve of the private key.',
@@ -102,10 +114,11 @@ def run_module():
         }
     )
 
+    # 'country' is only required to generate a CA - an imported one carries its
+    # own subject. required_if cannot express that, so Ca.check() enforces it.
     module = AnsibleModule(
         argument_spec=module_args,
         supports_check_mode=True,
-        required_if=[('state', 'present', ['country'])],
     )
 
     module_wrapper(Ca(module=module, result=result))

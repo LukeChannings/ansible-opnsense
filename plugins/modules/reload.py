@@ -60,6 +60,11 @@ def run_module():
                 'nut',
                 'interface_assignment',
                 'radvd',
+                'udpbroadcastrelay',
+                'nodeexporter',
+                'crowdsec',
+                'tailscale',
+                'netflow',
             ],
             description='What part of the running config should be reloaded'
         ),
@@ -211,6 +216,26 @@ def run_module():
         elif target == 'radvd':
             from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.radvd import \
                 Radvd as Target_Obj
+
+        elif target == 'udpbroadcastrelay':
+            from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.udpbroadcastrelay import \
+                Relay as Target_Obj
+
+        elif target == 'nodeexporter':
+            from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.nodeexporter import \
+                General as Target_Obj
+
+        elif target == 'crowdsec':
+            from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.crowdsec_general import \
+                General as Target_Obj
+
+        elif target == 'tailscale':
+            from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.tailscale_general import \
+                General as Target_Obj
+
+        elif target == 'netflow':
+            from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.netflow import \
+                General as Target_Obj
 
     except MODULE_EXCEPTIONS:
         module_dependency_error()

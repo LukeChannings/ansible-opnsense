@@ -26,6 +26,12 @@
         'data' not in opn_pre1 or
         opn_pre1.data | length != 0
 
+    # since os-frr 2.0 'area' is a relation into 'areas.area' - the area the
+    # interfaces below reference has to exist before it can be linked
+    - name: Adding the backbone area
+      oxlorg.opnsense.frr_ospf3_area:
+        area: '0.0.0.0'
+
     - name: Removing - does not exist
       oxlorg.opnsense.frr_ospf3_interface:
         interface: 'lan'
@@ -171,6 +177,12 @@
       loop:
         - 'opt1'
         - 'lan'
+      when: not ansible_check_mode
+
+    - name: Cleanup the backbone area
+      oxlorg.opnsense.frr_ospf3_area:
+        area: '0.0.0.0'
+        state: 'absent'
       when: not ansible_check_mode
 
     - name: Listing

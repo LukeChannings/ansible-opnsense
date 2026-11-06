@@ -34,3 +34,7 @@
         - 'os-haproxy'
         - 'os-wazuh-agent'
         - 'os-nut'
+        - 'os-udpbroadcastrelay'
+        - 'os-node_exporter'
+        - 'os-crowdsec'
+        - 'os-tailscale'

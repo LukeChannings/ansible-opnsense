@@ -1,3 +1,6 @@
+from base64 import b64decode
+from binascii import Error as BinasciiError
+from hashlib import sha256
 from ipaddress import ip_address
 
 from ansible.module_utils.basic import AnsibleModule
@@ -33,6 +36,35 @@ TRUST_SAN_TRANSLATE = {
 }
 
 SECONDS_PER_DAY = 86400
+
+PEM_CERT_BEGIN = '-----BEGIN CERTIFICATE-----'
+PEM_CERT_END = '-----END CERTIFICATE-----'
+
+
+def certificate_fingerprint(pem: (str, None)) -> str:
+    """SHA256 over the DER body of a PEM certificate.
+
+    Used to tell 'the same certificate' from 'a rotated one'. The API re-wraps
+    what it stores, so the PEM text cannot be compared directly - and a
+    fingerprint keeps whole certificates out of the module-diff.
+
+    Returns '' when the input is not a usable PEM certificate, which the caller
+    uses to reject it.
+    """
+    text = str(pem) if pem is not None else ''
+    if PEM_CERT_BEGIN not in text or PEM_CERT_END not in text:
+        return ''
+
+    body = text.split(PEM_CERT_BEGIN, 1)[1].split(PEM_CERT_END, 1)[0]
+    body = ''.join(body.split())
+    if body == '':
+        return ''
+
+    try:
+        return sha256(b64decode(body, validate=True)).hexdigest()
+
+    except (BinasciiError, ValueError):
+        return ''
 
 
 def strip_keys_and_duplicates(entry: dict) -> dict:
