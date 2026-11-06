@@ -263,6 +263,7 @@ not implemented => development => [testing](https://github.com/O-X-L/ansible-opn
 | **HAProxy**               | oxlorg.opnsense.haproxy_action                                 | [Docs](https://ansible-opnsense.oxl.app/modules/haproxy.html)                                                   | unstable |
 | **HAProxy**               | oxlorg.opnsense.haproxy_errorfile                              | [Docs](https://ansible-opnsense.oxl.app/modules/haproxy.html)                                                   | unstable |
 | **HAProxy**               | oxlorg.opnsense.haproxy_fcgi                                   | [Docs](https://ansible-opnsense.oxl.app/modules/haproxy.html)                                                   | unstable |
+| **UDP Broadcast Relay**   | oxlorg.opnsense.udpbroadcastrelay                              | [Docs](https://ansible-opnsense.oxl.app/modules/udpbroadcastrelay.html)                                         | unstable |
 
 ### Roadmap
 

@@ -34,3 +34,4 @@
         - 'os-haproxy'
         - 'os-wazuh-agent'
         - 'os-nut'
+        - 'os-udpbroadcastrelay'
