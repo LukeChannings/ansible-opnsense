@@ -53,6 +53,7 @@ TARGETS = [
     'haproxy_healthcheck', 'haproxy_server', 'wazuh_agent', 'nut', 'interface_assignment', 'radvd', 'trust_ca',
     'trust_cert', 'udpbroadcastrelay', 'nodeexporter', 'crowdsec_general', 'tailscale_general', 'tailscale_subnet',
     'netflow',
+    'frr_ospf_area', 'frr_ospf3_area',
 ]
 
 
@@ -274,6 +275,14 @@ def run_module():
         elif target == 'frr_ospf3_interface':
             from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.frr_ospf3_interface \
                 import Interface as Target_Obj
+
+        elif target == 'frr_ospf_area':
+            from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.frr_ospf_area \
+                import Area as Target_Obj
+
+        elif target == 'frr_ospf3_area':
+            from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.frr_ospf3_area \
+                import Area as Target_Obj
 
         elif target == 'frr_ospf_prefix_list':
             from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.frr_ospf_prefix_list \
