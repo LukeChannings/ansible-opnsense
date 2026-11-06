@@ -45,13 +45,17 @@ class Interface(BaseModule):
     }
     FIELDS_TYPING = {
         'bool': ['enabled', 'passive'],
-        'select': ['interface', 'carp_depend_on', 'network_type'],
+        'select': ['interface', 'carp_depend_on', 'network_type', 'area'],
     }
     EXIST_ATTR = 'int'
+    SEARCH_ADDITIONAL = {
+        'existing_areas': 'ospf6.areas.area',
+    }
 
     def __init__(self, module: AnsibleModule, result: dict, session: Session = None, fail: dict = None):
         BaseModule.__init__(self=self, m=module, r=result, s=session, f=fail)
         self.int = {}
+        self.existing_areas = None
 
     def check(self) -> None:
         if self.p['state'] == 'present':
@@ -61,3 +65,23 @@ class Interface(BaseModule):
                 )
 
         self._base_check()
+
+        if self.p['state'] == 'present':
+            # 'area' is a relation to an entry of 'ospf6.areas.area' - the API wants its uuid
+            self.find_single_link(
+                field='area',
+                existing=self.existing_areas,
+                existing_field_id='id',
+            )
+
+    def get_existing(self) -> list:
+        existing = []
+
+        for entry in self._base_get_existing():
+            # resolve the area-uuid back to its id ('0.0.0.0') so it stays comparable
+            if entry['area'] not in [None, ''] and entry['area'] in self.existing_areas:
+                entry['area'] = self.existing_areas[entry['area']]['id']
+
+            existing.append(entry)
+
+        return existing
