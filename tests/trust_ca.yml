@@ -176,6 +176,130 @@
         opn_list3.data | selectattr('descr', 'match', '^ANSIBLE_TEST_') | list | length != 1
       when: not ansible_check_mode
 
+
+    # --- importing an externally-issued CA -----------------------------------
+    # Self-signed throwaway CAs, valid until 2126 so the test does not rot.
+    # The API runs openssl_x509_parse on these, so they have to be real.
+    - name: 'Adding 4 - failing because the certificate is not a PEM certificate'
+      oxlorg.opnsense.trust_ca:
+        description: 'ANSIBLE_TEST_1_4'
+        certificate: 'not-a-certificate'
+      register: opn_imp_fail1
+      failed_when: not opn_imp_fail1.failed
+
+    - name: 'Adding 4 - importing an existing CA'
+      oxlorg.opnsense.trust_ca:
+        description: 'ANSIBLE_TEST_1_4'
+        certificate: |
+          -----BEGIN CERTIFICATE-----
+          MIICczCCAhoCCQCWqWGNrfAs1jAKBggqhkjOPQQDAjBHMQswCQYDVQQGEwJBVDEV
+          MBMGA1UECgwMQW5zaWJsZSBUZXN0MSEwHwYDVQQDDBhBTlNJQkxFX1RFU1RfSU1Q
+          T1JUX0NBXzEwIBcNMjYxMTA2MTU0NzM2WhgPMjEyNjEwMTMxNTQ3MzZaMEcxCzAJ
+          BgNVBAYTAkFUMRUwEwYDVQQKDAxBbnNpYmxlIFRlc3QxITAfBgNVBAMMGEFOU0lC
+          TEVfVEVTVF9JTVBPUlRfQ0FfMTCCAUswggEDBgcqhkjOPQIBMIH3AgEBMCwGByqG
+          SM49AQECIQD/////AAAAAQAAAAAAAAAAAAAAAP///////////////zBbBCD/////
+          AAAAAQAAAAAAAAAAAAAAAP///////////////AQgWsY12Ko6k+ez671VdpiGvGUd
+          BrDMU7D2O848PifSYEsDFQDEnTYIhucEk2pmeOETnSa3gZ9+kARBBGsX0fLhLEJH
+          +Lzm5WOkQPJ3A32BLeszoPShOUXYmMKWT+NC4v4af5uO5+tKfA+eFivOM1drMV7O
+          y7ZAaDe/UfUCIQD/////AAAAAP//////////vOb6racXnoTzucrC/GMlUQIBAQNC
+          AAR2+G1FYlUTEXAKjwTiWbJWqa9glkb1CO4UllpzwgmUHInmM+f6+/5rXMjTijz/
+          K+IO7WyipbB3WVc16tOyPpBZMAoGCCqGSM49BAMCA0cAMEQCIGpKeB2qbHZGznnW
+          O2dWraRRIQTDG4uf2IpSKUZQ+yOJAiAYrqmJAxypZyo6jzQIXRBjTIEXAgEZ9Atu
+          F3CglsUoHw==
+          -----END CERTIFICATE-----
+      register: opn_imp1
+      failed_when: >
+        opn_imp1.failed or
+        not opn_imp1.changed
+
+    - name: 'Adding 4 - nothing changed'
+      oxlorg.opnsense.trust_ca:
+        description: 'ANSIBLE_TEST_1_4'
+        certificate: |
+          -----BEGIN CERTIFICATE-----
+          MIICczCCAhoCCQCWqWGNrfAs1jAKBggqhkjOPQQDAjBHMQswCQYDVQQGEwJBVDEV
+          MBMGA1UECgwMQW5zaWJsZSBUZXN0MSEwHwYDVQQDDBhBTlNJQkxFX1RFU1RfSU1Q
+          T1JUX0NBXzEwIBcNMjYxMTA2MTU0NzM2WhgPMjEyNjEwMTMxNTQ3MzZaMEcxCzAJ
+          BgNVBAYTAkFUMRUwEwYDVQQKDAxBbnNpYmxlIFRlc3QxITAfBgNVBAMMGEFOU0lC
+          TEVfVEVTVF9JTVBPUlRfQ0FfMTCCAUswggEDBgcqhkjOPQIBMIH3AgEBMCwGByqG
+          SM49AQECIQD/////AAAAAQAAAAAAAAAAAAAAAP///////////////zBbBCD/////
+          AAAAAQAAAAAAAAAAAAAAAP///////////////AQgWsY12Ko6k+ez671VdpiGvGUd
+          BrDMU7D2O848PifSYEsDFQDEnTYIhucEk2pmeOETnSa3gZ9+kARBBGsX0fLhLEJH
+          +Lzm5WOkQPJ3A32BLeszoPShOUXYmMKWT+NC4v4af5uO5+tKfA+eFivOM1drMV7O
+          y7ZAaDe/UfUCIQD/////AAAAAP//////////vOb6racXnoTzucrC/GMlUQIBAQNC
+          AAR2+G1FYlUTEXAKjwTiWbJWqa9glkb1CO4UllpzwgmUHInmM+f6+/5rXMjTijz/
+          K+IO7WyipbB3WVc16tOyPpBZMAoGCCqGSM49BAMCA0cAMEQCIGpKeB2qbHZGznnW
+          O2dWraRRIQTDG4uf2IpSKUZQ+yOJAiAYrqmJAxypZyo6jzQIXRBjTIEXAgEZ9Atu
+          F3CglsUoHw==
+          -----END CERTIFICATE-----
+      register: opn_imp2
+      failed_when: >
+        opn_imp2.failed or
+        opn_imp2.changed
+      when: not ansible_check_mode
+
+    - name: 'Changing 4 - rotating the imported certificate'
+      oxlorg.opnsense.trust_ca:
+        description: 'ANSIBLE_TEST_1_4'
+        certificate: |
+          -----BEGIN CERTIFICATE-----
+          MIICdDCCAhoCCQCOTrpoTTu1+DAKBggqhkjOPQQDAjBHMQswCQYDVQQGEwJBVDEV
+          MBMGA1UECgwMQW5zaWJsZSBUZXN0MSEwHwYDVQQDDBhBTlNJQkxFX1RFU1RfSU1Q
+          T1JUX0NBXzIwIBcNMjYxMTA2MTU0NzM2WhgPMjEyNjEwMTMxNTQ3MzZaMEcxCzAJ
+          BgNVBAYTAkFUMRUwEwYDVQQKDAxBbnNpYmxlIFRlc3QxITAfBgNVBAMMGEFOU0lC
+          TEVfVEVTVF9JTVBPUlRfQ0FfMjCCAUswggEDBgcqhkjOPQIBMIH3AgEBMCwGByqG
+          SM49AQECIQD/////AAAAAQAAAAAAAAAAAAAAAP///////////////zBbBCD/////
+          AAAAAQAAAAAAAAAAAAAAAP///////////////AQgWsY12Ko6k+ez671VdpiGvGUd
+          BrDMU7D2O848PifSYEsDFQDEnTYIhucEk2pmeOETnSa3gZ9+kARBBGsX0fLhLEJH
+          +Lzm5WOkQPJ3A32BLeszoPShOUXYmMKWT+NC4v4af5uO5+tKfA+eFivOM1drMV7O
+          y7ZAaDe/UfUCIQD/////AAAAAP//////////vOb6racXnoTzucrC/GMlUQIBAQNC
+          AARyCgBJO/KHjtwVkM6rwNGj193XfQklNJQRzLvzyBysRRkYasPAEY/Y3qdnLMop
+          B9LUc2EP6aVbrIsXOC1Hz7jaMAoGCCqGSM49BAMCA0gAMEUCICYSKGjU0Hc6Jvyv
+          tqkRgaYKUdBsQKJ3cq31xmaFBukPAiEAj88Doy6AxkzzJqm4zAspq+YsMpq+C6O8
+          0ifig23Md/g=
+          -----END CERTIFICATE-----
+      register: opn_imp3
+      failed_when: >
+        opn_imp3.failed or
+        not opn_imp3.changed
+      when: not ansible_check_mode
+
+    - name: 'Changing 4 - nothing changed after the rotation'
+      oxlorg.opnsense.trust_ca:
+        description: 'ANSIBLE_TEST_1_4'
+        certificate: |
+          -----BEGIN CERTIFICATE-----
+          MIICdDCCAhoCCQCOTrpoTTu1+DAKBggqhkjOPQQDAjBHMQswCQYDVQQGEwJBVDEV
+          MBMGA1UECgwMQW5zaWJsZSBUZXN0MSEwHwYDVQQDDBhBTlNJQkxFX1RFU1RfSU1Q
+          T1JUX0NBXzIwIBcNMjYxMTA2MTU0NzM2WhgPMjEyNjEwMTMxNTQ3MzZaMEcxCzAJ
+          BgNVBAYTAkFUMRUwEwYDVQQKDAxBbnNpYmxlIFRlc3QxITAfBgNVBAMMGEFOU0lC
+          TEVfVEVTVF9JTVBPUlRfQ0FfMjCCAUswggEDBgcqhkjOPQIBMIH3AgEBMCwGByqG
+          SM49AQECIQD/////AAAAAQAAAAAAAAAAAAAAAP///////////////zBbBCD/////
+          AAAAAQAAAAAAAAAAAAAAAP///////////////AQgWsY12Ko6k+ez671VdpiGvGUd
+          BrDMU7D2O848PifSYEsDFQDEnTYIhucEk2pmeOETnSa3gZ9+kARBBGsX0fLhLEJH
+          +Lzm5WOkQPJ3A32BLeszoPShOUXYmMKWT+NC4v4af5uO5+tKfA+eFivOM1drMV7O
+          y7ZAaDe/UfUCIQD/////AAAAAP//////////vOb6racXnoTzucrC/GMlUQIBAQNC
+          AARyCgBJO/KHjtwVkM6rwNGj193XfQklNJQRzLvzyBysRRkYasPAEY/Y3qdnLMop
+          B9LUc2EP6aVbrIsXOC1Hz7jaMAoGCCqGSM49BAMCA0gAMEUCICYSKGjU0Hc6Jvyv
+          tqkRgaYKUdBsQKJ3cq31xmaFBukPAiEAj88Doy6AxkzzJqm4zAspq+YsMpq+C6O8
+          0ifig23Md/g=
+          -----END CERTIFICATE-----
+      register: opn_imp4
+      failed_when: >
+        opn_imp4.failed or
+        opn_imp4.changed
+      when: not ansible_check_mode
+
+    - name: 'Removing 4'
+      oxlorg.opnsense.trust_ca:
+        description: 'ANSIBLE_TEST_1_4'
+        state: 'absent'
+      register: opn_imp5
+      failed_when: >
+        opn_imp5.failed or
+        not opn_imp5.changed
+      when: not ansible_check_mode
+
     - name: Cleanup
       oxlorg.opnsense.trust_ca:
         description: "{{ item }}"

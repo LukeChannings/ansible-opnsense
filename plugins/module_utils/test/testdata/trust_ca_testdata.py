@@ -6,6 +6,9 @@ from ansible_collections.oxlorg.opnsense.plugins.module_utils.test.testdata.base
 SECRET = 'PRIVATE-KEY-MUST-NOT-ESCAPE'
 SECONDS_PER_DAY = 86400
 VALID_FROM = 1793033072
+# an imported certificate carries its own validity - the 'lifetime' that was
+# sent along is ignored, so the mock cannot derive the timestamps from it
+IMPORTED_LIFETIME_DAYS = 3650
 
 
 class TrustTestdata(MockOPNsenseController):
@@ -64,6 +67,23 @@ class TrustTestdata(MockOPNsenseController):
         entry['valid_from'] = str(VALID_FROM + len(self.regenerated))
         entry['valid_to'] = str(int(entry['valid_from']) + int(data['lifetime']) * SECONDS_PER_DAY)
 
+    def _import(self, entry: dict, data: dict) -> None:
+        # 'action: existing' hands the API a certificate instead of issuing one.
+        # The validity is parsed from it - re-sending the same payload (which is
+        # what an ordinary update does) must therefore not move the timestamps.
+        payload = data.get('crt_payload', '')
+        reissued = payload != entry.get('crt_payload')
+        entry['crt_payload'] = payload
+        entry['crt'] = 'BASE64-CRT'
+
+        if 'prv_payload' in data:
+            entry['prv_payload'] = data['prv_payload']
+            entry['prv'] = SECRET if data['prv_payload'] != '' else ''
+
+        if reissued or 'valid_from' not in entry:
+            entry['valid_from'] = str(VALID_FROM + len(self.regenerated))
+            entry['valid_to'] = str(int(entry['valid_from']) + IMPORTED_LIFETIME_DAYS * SECONDS_PER_DAY)
+
     def _build_entry(self, data: dict) -> dict:
         raise NotImplementedError
 
@@ -91,7 +111,13 @@ class TrustTestdata(MockOPNsenseController):
         uuid = self._new_uuid()
         entry = self._build_entry(data)
         entry['refid'] = self._new_refid()
-        self._issue(entry, data)
+
+        if data.get('action') == 'existing' and data.get('crt_payload', '') != '':
+            self._import(entry, data)
+
+        else:
+            self._issue(entry, data)
+
         self.state[uuid] = entry
         return {'result': 'saved', 'uuid': uuid}
 
@@ -106,6 +132,9 @@ class TrustTestdata(MockOPNsenseController):
         if data['action'] in self.ACTIONS_REGENERATE:
             self.regenerated.append(uuid)
             self._issue(entry, data)
+
+        elif data['action'] == 'existing' and data.get('crt_payload', '') != '':
+            self._import(entry, data)
 
         return {'result': 'saved'}
 
@@ -199,10 +228,40 @@ class Testdata_26_7_3(TrustTestdata):
         rows = [{'caref': e['refid'], 'descr': e['descr']} for e in self.state.values()]
         return {'rows': rows, 'count': len(rows)}
 
+    @staticmethod
+    def _pem_sections(payload: str) -> int:
+        return str(payload).count('-----BEGIN ')
+
+    def _validate_import(self, data: dict) -> (dict, None):
+        """Mirrors the 'existing' branch of CaController::setBaseAction.
+
+        Exactly one certificate is required; the private key is optional, and
+        only validated when one was actually supplied - a trust-only CA has none.
+        """
+        if self._pem_sections(data.get('crt_payload', '')) != 1:
+            return {'result': 'failed', 'validations': {
+                'ca.crt_payload': 'Only a single certificate is allowed',
+            }}
+
+        if self._pem_sections(data.get('prv_payload', '')) > 1:
+            return {'result': 'failed', 'validations': {
+                'ca.prv_payload': 'Only a single private key is allowed',
+            }}
+
+        return None
+
+    def _add(self, data: dict) -> dict:
+        if data[self.KEY].get('action') == 'existing':
+            invalid = self._validate_import(data[self.KEY])
+            if invalid is not None:
+                return invalid
+
+        return super()._add(data)
+
     def _set(self, uuid: str, data: dict) -> dict:
-        if data[self.KEY]['action'] == 'existing' and \
-                (data[self.KEY].get('crt_payload', '') == '' or data[self.KEY].get('prv_payload', '') == ''):
-            # the import-action requires the certificate & key to be passed
-            return {'result': 'failed', 'validations': {'ca.crt_payload': 'Only a single certificate is allowed'}}
+        if data[self.KEY]['action'] == 'existing':
+            invalid = self._validate_import(data[self.KEY])
+            if invalid is not None:
+                return invalid
 
         return super()._set(uuid, data)

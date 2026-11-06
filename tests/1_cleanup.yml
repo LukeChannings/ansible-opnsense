@@ -575,6 +575,7 @@
         description: "{{ item }}"
         state: 'absent'
       loop:
+        - 'ANSIBLE_TEST_1_4'
         - 'ANSIBLE_TEST_1_3'
         - 'ANSIBLE_TEST_1_2'
         - 'ANSIBLE_TEST_1_1'

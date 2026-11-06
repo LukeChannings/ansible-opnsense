@@ -33,12 +33,14 @@ oxlorg.opnsense.trust_ca
     :widths: 15 10 10 10 10 45
 
     "description","string","true","\-","desc","Unique description of the certificate authority"
+    "certificate","string","false","\-","crt, cert","PEM-encoded certificate of an existing CA to import, instead of having OPNsense generate one. Exactly one certificate - import a chain one entry at a time"
+    "private_key","string","false","\-","key, prv","PEM-encoded private key belonging to an imported certificate. Omit it to import trust-only; omitting it never removes a key the firewall already holds"
     "ca","string","false","\-","issuer","Description or reference-id of an existing CA that should sign this one. Leave empty to create a self-signed root CA"
     "key_type","string","false","prime256v1","\-","Key size (RSA) or elliptic curve of the private key. One of: '512', '1024', '2048', '3072', '4096', '7680', '8192', 'prime256v1', 'secp384r1', 'secp521r1'"
     "digest","string","false","sha256","\-","Digest algorithm used to sign the certificate. One of: 'sha1', 'sha224', 'sha256', 'sha384', 'sha512'"
     "lifetime","integer","false","825","\-","Validity of the certificate in days"
     "common_name","string","false","\-","cn","Common name of the CA"
-    "country","string","true (if state=present)","\-","\-","Two-letter country code"
+    "country","string","true (if state=present and no certificate is imported)","\-","\-","Two-letter country code"
     "state_or_province","string","false","\-","\-","State or province"
     "city","string","false","\-","\-","City"
     "organization","string","false","\-","\-","Organization"
@@ -107,6 +109,13 @@ To rename an entry, match it by another field: :code:`match_fields: ['common_nam
 Notes:
 
 * The **private keys are never returned** by :code:`trust_ca`, :code:`trust_cert` or the :code:`oxlorg.opnsense.list` output.
+
+* :code:`trust_ca` either **generates** a CA or **imports** one. Supplying :code:`certificate` switches it to
+  importing - the subject, key-type, digest and validity are then read out of the certificate, so the
+  generation-parameters are ignored and are not compared against the running config.
+  Imported CAs are matched on their fingerprint, so re-running is a no-op while rotating the
+  certificate rolls the new one out. OPNsense links an imported intermediate to its issuer by itself,
+  so import the root first.
   The public certificate is available as :code:`crt_payload` in the :code:`oxlorg.opnsense.list` output.
 * To use certificates in other services, export them using :code:`trust_export`. Its result contains :code:`uuid` and :code:`payload`.
 
@@ -183,6 +192,19 @@ Examples
             key_type: 'secp384r1'
             digest: 'sha384'
             lifetime: 7300
+
+        # trust a CA that was issued elsewhere - no private key, so the firewall
+        # can verify certificates signed by it but cannot sign with it
+        - name: Importing an existing root CA
+          oxlorg.opnsense.trust_ca:
+            description: 'Fleet Root CA'
+            certificate: "{{ lookup('ansible.builtin.file', '/etc/pki/fleet_root_ca.crt') }}"
+
+        # import the root first - OPNsense links the intermediate to its issuer itself
+        - name: Importing an existing intermediate CA
+          oxlorg.opnsense.trust_ca:
+            description: 'Fleet Intermediate CA'
+            certificate: "{{ lookup('ansible.builtin.file', '/etc/pki/fleet_intermediate_ca.crt') }}"
 
         - name: Adding an intermediate CA
           oxlorg.opnsense.trust_ca:
