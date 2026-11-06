@@ -182,3 +182,27 @@ def test_nat_source_automatic_mode_warns_on_absent(mocker):
 
     module.fail_json.assert_not_called()
     module.warn.assert_called_once()
+
+
+def test_nat_source_does_not_redirect_its_controller():
+    # SourceNatController defines its own search_rule/get_rule bound to
+    # 'snatrules.rule'. Pointing the GET at the 'filter' controller instead
+    # reaches FilterController's identically-named actions, which return
+    # 'filter.rules.rule' - ordinary firewall rules, which have no 'nonat'.
+    assert not hasattr(SNat, 'API_CONT_GET')
+    assert not hasattr(SNat, 'API_MOD_GET')
+
+
+def test_nat_source_searches_the_source_nat_controller(mocker):
+    module = MockAnsibleModule()
+    module.params.update({'state': 'present', 'match_fields': ['description'], 'debug': False})
+    snat = SNat(module=module, result={'changed': False, 'diff': {'before': {}, 'after': {}}})
+
+    posted = []
+    mocker.patch.object(snat, 'api_search_post', side_effect=lambda cnf: posted.append(cnf) or [])
+    mocker.patch.object(snat, '_api_get', return_value={'rule': {}})
+
+    snat.search(match_fields=['description'])
+
+    assert posted[0]['controller'] == 'source_nat'
+    assert posted[0]['module'] == 'firewall'
