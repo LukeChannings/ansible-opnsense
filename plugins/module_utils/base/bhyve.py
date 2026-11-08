@@ -1,6 +1,9 @@
+from os import makedirs
 from os import path as os_path
 from os import stat as os_stat
+from shutil import copyfile
 from tempfile import mkstemp
+from time import sleep, time
 
 from ansible.module_utils.basic import AnsibleModule
 
@@ -8,6 +11,7 @@ from ansible_collections.oxlorg.opnsense.plugins.module_utils.helper.bhyve impor
     BhyveError, parse_conf, parse_datastore
 
 VM_CMD = '/usr/local/sbin/vm'
+STOP_POLL_INTERVAL = 2
 
 
 class BhyveHost:
@@ -51,6 +55,14 @@ class BhyveHost:
         return os_stat(file_path).st_size
 
     @staticmethod
+    def copy(source: str, destination: str) -> None:
+        copyfile(source, destination)
+
+    @staticmethod
+    def make_dir(dir_path: str) -> None:
+        makedirs(dir_path, exist_ok=True)
+
+    @staticmethod
     def read(file_path: str) -> str:
         if not os_path.exists(file_path):
             return ''
@@ -68,6 +80,40 @@ class BhyveHost:
             file.write(content)
 
         self.m.atomic_move(tmp_path, file_path)
+
+    # guests
+
+    @staticmethod
+    def is_running(name: str) -> bool:
+        """Whether a guest is running, checked the way vm-bhyve checks it itself.
+
+        See 'vm::confirm_stopped': a guest owns a /dev/vmm entry for as long as
+        bhyve has it loaded.
+        """
+        return os_path.exists(f'/dev/vmm/{name}')
+
+    def stop_guest(self, name: str, timeout: int) -> None:
+        """Shuts a guest down, giving it the chance to do so cleanly.
+
+        'vm stop' only sends an ACPI shutdown and returns, so the guest is given
+        'timeout' seconds to go away before it is powered off the hard way.
+        """
+        if not self.is_running(name):
+            return
+
+        self.vm(['stop', name])
+        deadline = time() + timeout
+
+        while time() < deadline:
+            if not self.is_running(name):
+                return
+
+            sleep(STOP_POLL_INTERVAL)
+
+        self.m.warn(
+            f"guest '{name}' did not shut down within {timeout}s and was powered off"
+        )
+        self.vm(['poweroff', '-f', name])
 
     # interfaces
 
@@ -110,8 +156,8 @@ class BhyveHost:
 
         return stdout.strip()
 
-    def vm_dir(self) -> str:
-        """The directory of the default datastore, as configured in rc.conf.
+    def vm_dir_spec(self) -> str:
+        """The specification of the default datastore, as configured in rc.conf.
 
         Fails the task when vm-bhyve has not been set up, rather than letting the
         caller work on a host where no 'vm' command would run at all.
@@ -129,7 +175,13 @@ class BhyveHost:
                 'module against it first'
             )
 
+        return spec
+
+    def vm_dir(self) -> str:
+        """The directory of the default datastore."""
+        spec = self.vm_dir_spec()
         resolved = self.datastore_path(spec)
+
         if not os_path.isdir(resolved):
             raise BhyveError(
                 f"the vm-bhyve datastore '{spec}' is not a directory on this host - "

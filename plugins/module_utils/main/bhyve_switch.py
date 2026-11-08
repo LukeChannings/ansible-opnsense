@@ -3,7 +3,8 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.oxlorg.opnsense.plugins.module_utils.base.bhyve import \
     BhyveModule
 from ansible_collections.oxlorg.opnsense.plugins.module_utils.helper.bhyve import \
-    BhyveError, is_valid_name, plan_switch, switch_bridge, switch_names
+    BhyveError, clear_switch_bridge, is_valid_name, plan_switch, render_conf, \
+    switch_bridge, switch_names
 
 
 class Switch(BhyveModule):
@@ -59,6 +60,7 @@ class Switch(BhyveModule):
 
         if self.action in ['destroy', 'recreate']:
             self.h.vm(['switch', 'destroy', self.p['name']])
+            self._clear_leftovers()
 
         if self.action in ['create', 'recreate']:
             self.h.vm([
@@ -73,3 +75,10 @@ class Switch(BhyveModule):
                 f"switch '{self.p['name']}' now attaches to a different bridge - "
                 'running guests keep using the old one until they are restarted'
             )
+
+    def _clear_leftovers(self) -> None:
+        """Removes what 'vm switch destroy' forgets, so removal really removes."""
+        conf_path = f'{self.h.vm_dir()}/.config/system.conf'
+        cleared = clear_switch_bridge(self.h.read_conf(conf_path), self.p['name'])
+
+        self.h.write(conf_path, render_conf(cleared))
