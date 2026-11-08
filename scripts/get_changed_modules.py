@@ -25,6 +25,15 @@ PREFIX_MODULES = [
     'tests/',
 ]
 PATH_MAPPING = {
+    # the bhyve modules share a single test-playbook, so their names do not
+    # match one of their own
+    'plugins/modules/bhyve_general.py': ['bhyve'],
+    'plugins/modules/bhyve_switch.py': ['bhyve'],
+    'plugins/modules/bhyve_guest.py': ['bhyve'],
+    'plugins/module_utils/main/bhyve_general.py': ['bhyve'],
+    'plugins/module_utils/main/bhyve_switch.py': ['bhyve'],
+    'plugins/module_utils/main/bhyve_guest.py': ['bhyve'],
+    'plugins/module_utils/helper/bhyve.py': ['bhyve'],
     'plugins/module_utils/defaults/alias.py': ['alias', 'alias_multi'],
     'plugins/module_utils/defaults/bind_record.py': ['bind_record', 'bind_record_multi'],
     'plugins/module_utils/defaults/ipsec_auth.py': ['ipsec_auth_local', 'ipsec_auth_remote'],

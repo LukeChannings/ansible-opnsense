@@ -1,0 +1,428 @@
+---
+
+# Unlike the api-modules these run on the firewall itself (see ADR-0001), so this
+# playbook targets it over SSH instead of localhost.
+#
+#   TEST_SSH_HOST    inventory host of the firewall to test against ('opnsense')
+#   TEST_BHYVE_BRIDGE  existing bridge interface the test switch may attach to
+#   TEST_BHYVE_DIR   datastore directory, if not '/zroot/virtual-machines'
+#
+# The test guest and switch are named 'ansibletest*' and are removed again at the
+# end; existing guests and switches are left alone.
+
+- name: Testing bhyve
+  hosts: "{{ lookup('ansible.builtin.env', 'TEST_SSH_HOST') | default('opnsense', true) }}"
+  gather_facts: no
+  become: true
+
+  vars:
+    test_guest: 'ansibletestguest'
+    test_switch: 'ansibletestswitch'
+    test_bridge: "{{ lookup('ansible.builtin.env', 'TEST_BHYVE_BRIDGE') }}"
+    test_image: '/tmp/ansible-bhyve-test-image.raw'
+    test_vm_dir: "{{ lookup('ansible.builtin.env', 'TEST_BHYVE_DIR') | default('/zroot/virtual-machines', true) }}"
+    test_magic: 'ANSIBLE-BHYVE-TEST-IMAGE'
+
+  tasks:
+    - name: Setting up the host
+      oxlorg.opnsense.bhyve_general:
+      register: opn1
+      failed_when: opn1.failed
+
+    - name: Setting up the host - nothing changed
+      oxlorg.opnsense.bhyve_general:
+      register: opn2
+      failed_when: >
+        opn2.failed or
+        opn2.changed
+      when: not ansible_check_mode
+
+    - name: Adding a switch - failing because the bridge does not exist
+      oxlorg.opnsense.bhyve_switch:
+        name: "{{ test_switch }}"
+        bridge: 'ansibletestbridge0'
+      register: opn_fail1
+      failed_when: not opn_fail1.failed
+
+    - name: Adding a switch - failing because the name is invalid
+      oxlorg.opnsense.bhyve_switch:
+        name: 'not a switch name'
+        bridge: "{{ test_bridge }}"
+      register: opn_fail2
+      failed_when: not opn_fail2.failed
+
+    - name: Adding a switch
+      oxlorg.opnsense.bhyve_switch:
+        name: "{{ test_switch }}"
+        bridge: "{{ test_bridge }}"
+      register: opn3
+      failed_when: >
+        opn3.failed or
+        not opn3.changed
+
+    - name: Adding a switch - nothing changed
+      oxlorg.opnsense.bhyve_switch:
+        name: "{{ test_switch }}"
+        bridge: "{{ test_bridge }}"
+      register: opn4
+      failed_when: >
+        opn4.failed or
+        opn4.changed
+      when: not ansible_check_mode
+
+    - name: Building an image for the guest to be installed from
+      ansible.builtin.shell:
+        cmd: "printf '{{ test_magic }}' > {{ test_image }} && truncate -s 4M {{ test_image }}"
+      changed_when: true
+      when: not ansible_check_mode
+
+    - name: Adding a guest - failing because the switch does not exist
+      oxlorg.opnsense.bhyve_guest:
+        name: "{{ test_guest }}"
+        cpu: 1
+        memory: '256M'
+        loader: 'uefi'
+        disks: [{size: '8M'}]
+        nics: [{switch: 'ansibletestnoswitch'}]
+      register: opn_fail3
+      failed_when: not opn_fail3.failed
+
+    - name: Adding a guest - failing because it has no disk to boot
+      oxlorg.opnsense.bhyve_guest:
+        name: "{{ test_guest }}"
+        cpu: 1
+        memory: '256M'
+        loader: 'uefi'
+      register: opn_fail4
+      failed_when: not opn_fail4.failed
+
+    - name: Adding a guest - failing because the image does not exist
+      oxlorg.opnsense.bhyve_guest:
+        name: "{{ test_guest }}"
+        cpu: 1
+        memory: '256M'
+        loader: 'uefi'
+        disks: [{size: '8M'}]
+        image: '/tmp/ansible-bhyve-no-such-image.raw'
+      register: opn_fail5
+      failed_when: not opn_fail5.failed
+
+    - name: Adding a guest
+      oxlorg.opnsense.bhyve_guest:
+        name: "{{ test_guest }}"
+        cpu: 1
+        memory: '256M'
+        loader: 'uefi'
+        disks: [{size: '8M', type: 'virtio-blk'}]
+        nics: [{switch: "{{ test_switch }}"}]
+        image: "{{ test_image }}"
+      register: opn5
+      failed_when: >
+        opn5.failed or
+        not opn5.changed
+
+    - name: Adding a guest - nothing changed
+      oxlorg.opnsense.bhyve_guest:
+        name: "{{ test_guest }}"
+        cpu: 1
+        memory: '256M'
+        loader: 'uefi'
+        disks: [{size: '8M', type: 'virtio-blk'}]
+        nics: [{switch: "{{ test_switch }}"}]
+        image: "{{ test_image }}"
+      register: opn6
+      failed_when: >
+        opn6.failed or
+        opn6.changed
+      when: not ansible_check_mode
+
+    - name: Reading the guest configuration
+      ansible.builtin.slurp:
+        src: "{{ test_vm_dir }}/{{ test_guest }}/{{ test_guest }}.conf"
+      register: guest_conf
+      when: not ansible_check_mode
+
+    - name: Checking the guest was written as declared
+      ansible.builtin.assert:
+        that:
+          - "'cpu=\"1\"' in (guest_conf.content | b64decode)"
+          - "'memory=\"256M\"' in (guest_conf.content | b64decode)"
+          - "'loader=\"uefi\"' in (guest_conf.content | b64decode)"
+          - "'disk0_type=\"virtio-blk\"' in (guest_conf.content | b64decode)"
+          - "'disk0_name=\"disk0.img\"' in (guest_conf.content | b64decode)"
+          - "'network0_switch=\"' + test_switch + '\"' in (guest_conf.content | b64decode)"
+          - "'disk0_size' not in (guest_conf.content | b64decode)"
+      when: not ansible_check_mode
+
+    - name: Reading the start of the guests boot disk
+      ansible.builtin.command:
+        cmd: "head -c {{ test_magic | length }} {{ test_vm_dir }}/{{ test_guest }}/disk0.img"
+      register: seeded
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Checking the boot disk was seeded from the image
+      ansible.builtin.assert:
+        that:
+          - seeded.stdout == test_magic
+      when: not ansible_check_mode
+
+    - name: Changing a guest - failing because a disk may not shrink
+      oxlorg.opnsense.bhyve_guest:
+        name: "{{ test_guest }}"
+        disks: [{size: '4M'}]
+      register: opn_fail6
+      failed_when: not opn_fail6.failed
+      when: not ansible_check_mode
+
+    - name: Changing a guest - failing because a disk may not be dropped
+      oxlorg.opnsense.bhyve_guest:
+        name: "{{ test_guest }}"
+        disks: []
+      register: opn_fail7
+      failed_when: not opn_fail7.failed
+      when: not ansible_check_mode
+
+    - name: Changing a guest - growing its disk
+      oxlorg.opnsense.bhyve_guest:
+        name: "{{ test_guest }}"
+        disks: [{size: '16M'}]
+      register: opn7
+      failed_when: >
+        opn7.failed or
+        not opn7.changed
+      when: not ansible_check_mode
+
+    - name: Changing a guest - growing its disk, nothing changed
+      oxlorg.opnsense.bhyve_guest:
+        name: "{{ test_guest }}"
+        disks: [{size: '16M'}]
+      register: opn8
+      failed_when: >
+        opn8.failed or
+        opn8.changed
+      when: not ansible_check_mode
+
+    - name: Changing a guest - reconfiguring it
+      oxlorg.opnsense.bhyve_guest:
+        name: "{{ test_guest }}"
+        cpu: 2
+        memory: '512M'
+      register: opn9
+      failed_when: >
+        opn9.failed or
+        not opn9.changed or
+        opn9.diff.before.cpu != '1' or
+        opn9.diff.after.cpu != '2'
+      when: not ansible_check_mode
+
+    - name: Checking the settings it does not manage survived
+      ansible.builtin.slurp:
+        src: "{{ test_vm_dir }}/{{ test_guest }}/{{ test_guest }}.conf"
+      register: guest_conf2
+      when: not ansible_check_mode
+
+    - name: Checking the guest kept its identity
+      ansible.builtin.assert:
+        that:
+          - "'network0_switch=\"' + test_switch + '\"' in (guest_conf2.content | b64decode)"
+          - "'disk0_name=\"disk0.img\"' in (guest_conf2.content | b64decode)"
+      when: not ansible_check_mode
+
+    - name: Starting a guest
+      oxlorg.opnsense.bhyve_guest:
+        name: "{{ test_guest }}"
+        running: true
+      register: opn_run1
+      failed_when: >
+        opn_run1.failed or
+        not opn_run1.changed
+      when: not ansible_check_mode
+
+    - name: Checking the guest is running
+      ansible.builtin.stat:
+        path: "/dev/vmm/{{ test_guest }}"
+      register: vmm1
+      failed_when: not vmm1.stat.exists
+      when: not ansible_check_mode
+
+    - name: Starting a guest - nothing changed
+      oxlorg.opnsense.bhyve_guest:
+        name: "{{ test_guest }}"
+        running: true
+      register: opn_run2
+      failed_when: >
+        opn_run2.failed or
+        opn_run2.changed
+      when: not ansible_check_mode
+
+    - name: Reconfiguring a running guest - written, but not applied yet
+      oxlorg.opnsense.bhyve_guest:
+        name: "{{ test_guest }}"
+        memory: '320M'
+      register: opn_run3
+      failed_when: >
+        opn_run3.failed or
+        not opn_run3.changed
+      when: not ansible_check_mode
+
+    - name: Checking the guest was left running
+      ansible.builtin.stat:
+        path: "/dev/vmm/{{ test_guest }}"
+      register: vmm2
+      failed_when: not vmm2.stat.exists
+      when: not ansible_check_mode
+
+    - name: Reconfiguring a running guest - applied on request
+      oxlorg.opnsense.bhyve_guest:
+        name: "{{ test_guest }}"
+        memory: '384M'
+        restart_on_change: true
+      register: opn_run4
+      failed_when: >
+        opn_run4.failed or
+        not opn_run4.changed
+      when: not ansible_check_mode
+
+    - name: Checking the guest came back up
+      ansible.builtin.stat:
+        path: "/dev/vmm/{{ test_guest }}"
+      register: vmm3
+      failed_when: not vmm3.stat.exists
+      when: not ansible_check_mode
+
+    - name: Stopping a guest
+      oxlorg.opnsense.bhyve_guest:
+        name: "{{ test_guest }}"
+        running: false
+        stop_timeout: 30
+      register: opn_run5
+      failed_when: >
+        opn_run5.failed or
+        not opn_run5.changed
+      when: not ansible_check_mode
+
+    - name: Checking the guest is stopped
+      ansible.builtin.stat:
+        path: "/dev/vmm/{{ test_guest }}"
+      register: vmm4
+      failed_when: vmm4.stat.exists
+      when: not ansible_check_mode
+
+    - name: Stopping a guest - nothing changed
+      oxlorg.opnsense.bhyve_guest:
+        name: "{{ test_guest }}"
+        running: false
+      register: opn_run6
+      failed_when: >
+        opn_run6.failed or
+        opn_run6.changed
+      when: not ansible_check_mode
+
+    - name: Changing a guest - autostarting it
+      oxlorg.opnsense.bhyve_guest:
+        name: "{{ test_guest }}"
+        autostart: true
+      register: opn10
+      failed_when: >
+        opn10.failed or
+        not opn10.changed
+      when: not ansible_check_mode
+
+    - name: Changing a guest - autostarting it, nothing changed
+      oxlorg.opnsense.bhyve_guest:
+        name: "{{ test_guest }}"
+        autostart: true
+      register: opn11
+      failed_when: >
+        opn11.failed or
+        opn11.changed
+      when: not ansible_check_mode
+
+    - name: Reading the autostart list
+      ansible.builtin.command:
+        cmd: 'sysrc -n vm_list'
+      register: autostarted
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Checking the guest joined the autostart list
+      ansible.builtin.assert:
+        that:
+          - test_guest in autostarted.stdout.split()
+      when: not ansible_check_mode
+
+    - name: Changing a guest - no longer autostarting it
+      oxlorg.opnsense.bhyve_guest:
+        name: "{{ test_guest }}"
+        autostart: false
+      register: opn12
+      failed_when: >
+        opn12.failed or
+        not opn12.changed
+      when: not ansible_check_mode
+
+    - name: Removing a guest
+      oxlorg.opnsense.bhyve_guest:
+        name: "{{ test_guest }}"
+        state: 'absent'
+      register: opn13
+      failed_when: >
+        opn13.failed or
+        not opn13.changed
+      when: not ansible_check_mode
+
+    - name: Removing a guest - nothing changed
+      oxlorg.opnsense.bhyve_guest:
+        name: "{{ test_guest }}"
+        state: 'absent'
+      register: opn14
+      failed_when: >
+        opn14.failed or
+        opn14.changed
+      when: not ansible_check_mode
+
+    - name: Checking the guest is gone
+      ansible.builtin.stat:
+        path: "{{ test_vm_dir }}/{{ test_guest }}"
+      register: guest_dir
+      failed_when: guest_dir.stat.exists
+      when: not ansible_check_mode
+
+    - name: Cleanup - removing the switch
+      oxlorg.opnsense.bhyve_switch:
+        name: "{{ test_switch }}"
+        state: 'absent'
+      register: opn15
+      failed_when: >
+        opn15.failed or
+        not opn15.changed
+      when: not ansible_check_mode
+
+    - name: Cleanup - removing the switch, nothing changed
+      oxlorg.opnsense.bhyve_switch:
+        name: "{{ test_switch }}"
+        state: 'absent'
+      register: opn16
+      failed_when: >
+        opn16.failed or
+        opn16.changed
+      when: not ansible_check_mode
+
+    - name: Reading the host configuration
+      ansible.builtin.slurp:
+        src: "{{ test_vm_dir }}/.config/system.conf"
+      register: system_conf
+      when: not ansible_check_mode
+
+    - name: Checking the switch left nothing behind
+      ansible.builtin.assert:
+        that:
+          - test_switch not in (system_conf.content | b64decode)
+      when: not ansible_check_mode
+
+    - name: Cleanup - removing the image
+      ansible.builtin.file:
+        path: "{{ test_image }}"
+        state: 'absent'
+      when: not ansible_check_mode
