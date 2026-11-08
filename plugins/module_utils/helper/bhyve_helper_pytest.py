@@ -3,7 +3,8 @@ from pytest import raises
 from ansible_collections.oxlorg.opnsense.plugins.module_utils.helper.bhyve import \
     parse_conf, render_conf, build_guest_conf, size_to_bytes, plan_disks, \
     switch_names, switch_bridge, conf_diff, apply_autostart, parse_datastore, \
-    is_valid_name, plan_switch, plan_running, clear_switch_bridge, BhyveError
+    is_valid_name, plan_switch, plan_running, clear_switch_bridge, is_zvol, \
+    BhyveError
 
 # the conf of the guest that exists on the development router
 GUEST_CONF_NIXOS = '''loader="grub"
@@ -337,7 +338,10 @@ def test_a_disk_without_an_image_file_is_created():
     conf = build_guest_conf(existing={}, params={'disks': [{'size': '20G'}]})
 
     assert plan_disks(conf, [{'size': '20G'}], sizes={0: None}) == [
-        {'index': 0, 'name': 'disk0.img', 'action': 'create', 'size': 20 * 1024 ** 3},
+        {
+            'index': 0, 'name': 'disk0.img', 'action': 'create',
+            'size': 20 * 1024 ** 3, 'dev': 'file', 'volblocksize': None,
+        },
     ]
 
 
@@ -345,7 +349,10 @@ def test_a_disk_declared_bigger_than_its_image_file_is_grown():
     conf = build_guest_conf(existing={}, params={'disks': [{'size': '20G'}]})
 
     assert plan_disks(conf, [{'size': '20G'}], sizes={0: 5 * 1024 ** 3}) == [
-        {'index': 0, 'name': 'disk0.img', 'action': 'grow', 'size': 20 * 1024 ** 3},
+        {
+            'index': 0, 'name': 'disk0.img', 'action': 'grow',
+            'size': 20 * 1024 ** 3, 'dev': 'file', 'volblocksize': None,
+        },
     ]
 
 
@@ -353,8 +360,66 @@ def test_a_disk_that_is_already_the_declared_size_is_left_alone():
     conf = build_guest_conf(existing={}, params={'disks': [{'size': '20G'}]})
 
     assert plan_disks(conf, [{'size': '20G'}], sizes={0: 20 * 1024 ** 3}) == [
-        {'index': 0, 'name': 'disk0.img', 'action': 'keep', 'size': 20 * 1024 ** 3},
+        {
+            'index': 0, 'name': 'disk0.img', 'action': 'keep',
+            'size': 20 * 1024 ** 3, 'dev': 'file', 'volblocksize': None,
+        },
     ]
+
+
+def test_a_zvol_backed_disk_is_planned_as_the_volume_it_is():
+    disks = [{'size': '40G', 'dev': 'zvol', 'volblocksize': '128k'}]
+    conf = build_guest_conf(existing={}, params={'disks': disks})
+
+    assert plan_disks(conf, disks, sizes={0: None}) == [
+        {
+            'index': 0, 'name': 'disk0', 'action': 'create',
+            'size': 40 * 1024 ** 3, 'dev': 'zvol', 'volblocksize': '128k',
+        },
+    ]
+
+
+def test_a_zvol_is_named_as_a_dataset_rather_than_a_file():
+    # it is a volume below the guest's dataset, where an '.img' suffix would
+    # only suggest a file that is not there
+    conf = build_guest_conf(
+        existing={}, params={'disks': [{'size': '40G', 'dev': 'sparse-zvol'}]},
+    )
+
+    assert conf['disk0_name'] == 'disk0'
+    assert conf['disk0_dev'] == 'sparse-zvol'
+
+
+def test_a_file_backed_disk_says_nothing_about_its_backing():
+    # 'file' is vm-bhyve's own default, so writing it would mark every guest
+    # that predates zvol support as changed
+    conf = build_guest_conf(existing={}, params={'disks': [{'size': '20G'}]})
+
+    assert 'disk0_dev' not in conf
+
+
+def test_an_undeclared_backing_keeps_the_one_the_disk_has():
+    existing = parse_conf('disk0_name="disk0"\ndisk0_dev="zvol"\n')
+    conf = build_guest_conf(existing=existing, params={'disks': [{'size': '40G'}]})
+
+    assert conf['disk0_dev'] == 'zvol'
+    assert conf['disk0_name'] == 'disk0'
+
+
+def test_rebacking_an_existing_disk_is_refused():
+    # the data is in the backing store, so swapping it is not a reconfiguration
+    # but a silent wipe
+    existing = parse_conf('disk0_name="disk0"\ndisk0_dev="zvol"\n')
+
+    with raises(BhyveError, match='cannot be turned into'):
+        build_guest_conf(existing=existing, params={'disks': [{'size': '40G', 'dev': 'file'}]})
+
+
+def test_only_volumes_count_as_zvols():
+    assert is_zvol('zvol')
+    assert is_zvol('sparse-zvol')
+    assert not is_zvol('file')
+    assert not is_zvol(None)
 
 
 def test_shrinking_a_disk_is_refused():

@@ -4,7 +4,7 @@ from ansible_collections.oxlorg.opnsense.plugins.module_utils.base.bhyve import 
     BhyveModule
 from ansible_collections.oxlorg.opnsense.plugins.module_utils.helper.bhyve import \
     BhyveError, apply_autostart, build_guest_conf, conf_diff, is_valid_name, \
-    parse_datastore, plan_disks, plan_running, render_conf, switch_names
+    is_zvol, parse_datastore, plan_disks, plan_running, render_conf, switch_names
 
 
 class Guest(BhyveModule):
@@ -143,11 +143,18 @@ class Guest(BhyveModule):
         )
 
     def _disk_sizes(self) -> dict:
-        """The current size of each declared disk's image file, by position."""
+        """The current size of each declared disk's backing store, by position."""
         return {
-            index: self.h.size_of(f"{self.path}/{self.desired[f'disk{index}_name']}")
-            for index in range(len(self.p['disks']))
+            index: self._size_of_disk(index) for index in range(len(self.p['disks']))
         }
+
+    def _size_of_disk(self, index: int) -> int:
+        name = self.desired[f'disk{index}_name']
+
+        if is_zvol(self.desired.get(f'disk{index}_dev')):
+            return self.h.zvol_size(self.h.zvol_dataset(self.p['name'], name))
+
+        return self.h.size_of(f'{self.path}/{name}')
 
     # process
 
@@ -188,27 +195,57 @@ class Guest(BhyveModule):
             if disk['action'] == 'keep':
                 continue
 
+            if is_zvol(disk['dev']):
+                self._apply_zvol(disk)
+                continue
+
             image_path = f"{self.path}/{disk['name']}"
 
-            if disk['action'] == 'create' and disk['index'] == 0 and self.p['image'] is not None:
-                self._seed_from_image(image_path, disk['size'])
+            if disk['action'] == 'create' and self._seeds(disk):
+                self._check_image_fits(disk['size'])
+                self.h.copy(self.p['image'], image_path)
 
             self.h.run(['truncate', '-s', disk['size'], image_path])
 
-    def _seed_from_image(self, image_path: str, size: int) -> None:
-        """Copies the declared image onto a disk that has none yet.
+    def _apply_zvol(self, disk: dict) -> None:
+        """Creates or grows a zvol, and seeds it where it is the boot disk.
 
-        Only ever done while the disk is missing, so re-running the module never
-        overwrites a guest that has since written to it. Deleting the disk is the
-        deliberate act that asks for the guest to be installed again.
+        A zvol is created at its full size rather than grown into it: unlike a
+        sparse file there is nothing to extend afterwards, and a thick one has to
+        reserve the space up front to be worth anything.
         """
+        dataset = self.h.zvol_dataset(self.p['name'], disk['name'])
+
+        if disk['action'] == 'grow':
+            self.h.zvol_grow(dataset, disk['size'])
+            return
+
+        self.h.zvol_create(
+            dataset,
+            size=disk['size'],
+            sparse=disk['dev'] == 'sparse-zvol',
+            volblocksize=disk['volblocksize'],
+        )
+
+        if self._seeds(disk):
+            self._check_image_fits(disk['size'])
+            self.h.write_device(self.p['image'], self.h.zvol_device(dataset))
+
+    def _seeds(self, disk: dict) -> bool:
+        """Whether this disk is the one the declared image installs onto.
+
+        Only ever the boot disk, and only while it is missing, so re-running the
+        module never overwrites a guest that has since written to it. Deleting the
+        disk is the deliberate act that asks for the guest to be installed again.
+        """
+        return disk['index'] == 0 and self.p['image'] is not None
+
+    def _check_image_fits(self, size: int) -> None:
         if self.h.size_of(self.p['image']) > size:
             raise BhyveError(
                 f"image '{self.p['image']}' is larger than the {size} bytes declared "
                 'for the disk it seeds'
             )
-
-        self.h.copy(self.p['image'], image_path)
 
     def _apply_autostart(self) -> None:
         if self.autostart_before == self.autostart_after:

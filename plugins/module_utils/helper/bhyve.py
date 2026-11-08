@@ -2,6 +2,8 @@ from re import match as regex_match
 
 NIC_TYPE_DEFAULT = 'virtio-net'
 DISK_TYPE_DEFAULT = 'virtio-blk'
+DISK_DEV_DEFAULT = 'file'
+DISK_DEVS_ZVOL = ['zvol', 'sparse-zvol']
 SIZE_UNITS = {'': 1, 'k': 1024, 'm': 1024 ** 2, 'g': 1024 ** 3, 't': 1024 ** 4}
 
 
@@ -86,11 +88,30 @@ def _nic_settings(nics: list, existing: dict) -> list:
     return settings
 
 
+def is_zvol(dev: str) -> bool:
+    """Whether a backing store is a zvol rather than a file in the guest's directory."""
+    return dev in DISK_DEVS_ZVOL
+
+
+def disk_dev(conf: dict, index: int) -> str:
+    """The backing store of a disk. vm-bhyve omits the setting for plain files."""
+    return conf.get(f'disk{index}_dev', DISK_DEV_DEFAULT)
+
+
+def default_disk_name(index: int, dev: str) -> str:
+    """What a disk is called when it is created.
+
+    A file lives in the guest's directory and is named like one; a zvol is a
+    dataset below the guest's own, where an '.img' suffix would only mislead.
+    """
+    return f'disk{index}' if is_zvol(dev) else f'disk{index}.img'
+
+
 def _disk_settings(disks: list, existing: dict) -> list:
     """Maps the declared disks onto the settings of 'diskN_*'.
 
     The declared size is deliberately not written: vm-bhyve removes 'diskN_size'
-    once the image exists, leaving the file on the host as the only truth.
+    once the image exists, leaving the disk on the host as the only truth.
     """
     current = indexed_settings(existing, 'disk')
     settings = []
@@ -105,13 +126,26 @@ def _disk_settings(disks: list, existing: dict) -> list:
     for index, disk in enumerate(disks):
         kept = {
             suffix: value for suffix, value in current.get(index, {}).items()
-            if suffix not in ['type', 'name']
+            if suffix not in ['type', 'name', 'dev']
         }
+        existing_dev = current.get(index, {}).get('dev')
+        dev = disk.get('dev') or existing_dev or DISK_DEV_DEFAULT
+
+        if existing_dev is not None and dev != existing_dev:
+            raise BhyveError(
+                f"guest disk{index} is backed by '{existing_dev}' and cannot be "
+                f"turned into '{dev}' - that would leave its data behind. Remove "
+                'the whole guest if you want to start over'
+            )
 
         settings.append({
             **kept,
             'type': disk.get('type') or DISK_TYPE_DEFAULT,
-            'name': current.get(index, {}).get('name') or f'disk{index}.img',
+            # Only ever written when it carries information: a file is
+            # vm-bhyve's default, so writing it would mark every guest that
+            # predates this module's zvol support as changed.
+            **({'dev': dev} if is_zvol(dev) or existing_dev is not None else {}),
+            'name': current.get(index, {}).get('name') or default_disk_name(index, dev),
         })
 
     return settings
@@ -260,17 +294,19 @@ def plan_switch(system_conf: dict, name: str, bridge: str, state: str) -> str:
 
 
 def plan_disks(conf: dict, disks: list, sizes: dict) -> list:
-    """Works out what has to happen to the image files of the declared disks.
+    """Works out what has to happen to the backing store of the declared disks.
 
     Takes the conf built by 'build_guest_conf', which has already refused to drop
-    a disk. 'sizes' holds the current size of each disk's image file in bytes, or
-    None where the file does not exist. Disks only ever grow: shrinking one would
-    truncate a filesystem the guest is using, so that is refused as well.
+    a disk. 'sizes' holds the current size of each disk's image file or zvol in
+    bytes, or None where it does not exist yet. Disks only ever grow: shrinking
+    one would truncate a filesystem the guest is using, so that is refused as
+    well.
     """
     planned = []
     for index, disk in enumerate(disks):
         size = size_to_bytes(disk['size'])
         current = sizes.get(index)
+        dev = disk_dev(conf, index)
 
         if current is None:
             action = 'create'
@@ -291,6 +327,8 @@ def plan_disks(conf: dict, disks: list, sizes: dict) -> list:
             'name': conf[f'disk{index}_name'],
             'action': action,
             'size': size,
+            'dev': dev,
+            'volblocksize': disk.get('volblocksize'),
         })
 
     return planned

@@ -17,7 +17,7 @@ try:
     from ansible_collections.oxlorg.opnsense.plugins.module_utils.defaults.main import \
         STATE_ONLY_MOD_ARG
     from ansible_collections.oxlorg.opnsense.plugins.module_utils.helper.bhyve import \
-        DISK_TYPE_DEFAULT, NIC_TYPE_DEFAULT
+        DISK_DEV_DEFAULT, DISK_TYPE_DEFAULT, NIC_TYPE_DEFAULT
     from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.bhyve_guest import Guest
 
 except MODULE_EXCEPTIONS:
@@ -59,6 +59,22 @@ def run_module():
                     type='str', required=False, default=DISK_TYPE_DEFAULT,
                     choices=['virtio-blk', 'ahci-hd', 'nvme'],
                     description='How the disk is attached to the guest',
+                ),
+                dev=dict(
+                    type='str', required=False,
+                    choices=['file', 'zvol', 'sparse-zvol'],
+                    description=f"What backs the disk, '{DISK_DEV_DEFAULT}' for a new "
+                                'one. A file lives in the guests directory; '
+                                'a zvol is a volume below the guests dataset '
+                                'and needs a zfs datastore. Zvols are thick unless '
+                                "'sparse-zvol' is asked for. The backing of an existing "
+                                'disk is kept when omitted and cannot be changed',
+                ),
+                volblocksize=dict(
+                    type='str', required=False,
+                    description="Block size of a zvol, like '128k'. Only ever applied "
+                                'when the zvol is created - zfs cannot change it '
+                                'afterwards. Ignored for file-backed disks',
                 ),
             ),
             description='Disks of the guest, in order. The first one is the boot disk. '

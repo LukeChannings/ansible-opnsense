@@ -109,7 +109,7 @@ oxlorg.opnsense.bhyve_guest
     "cpu","integer","false","\-","\-","Number of virtual cpus. Left as it is if omitted"
     "memory","string","false","\-","\-","Memory to give the guest, as a size like '2G'. Left as it is if omitted"
     "loader","string","false","\-","\-","How the guest is booted. 'uefi' is what a prebuilt raw image usually wants. Left as it is if omitted. One of: 'uefi', 'uefi-csm', 'bhyveload', 'grub'"
-    "disks","list of dicts","false","\-","\-","Disks of the guest, in order. The first one is the boot disk. Sub-options: 'size' (required, like '20G') and 'type' (one of: 'virtio-blk' (default), 'ahci-hd', 'nvme'). Disks can be added and grown; removing one from this list fails rather than throwing its data away"
+    "disks","list of dicts","false","\-","\-","Disks of the guest, in order. The first one is the boot disk. Sub-options: 'size' (required, like '20G'), 'type' (one of: 'virtio-blk' (default), 'ahci-hd', 'nvme'), 'dev' (what backs the disk - one of: 'file' (default for a new disk), 'zvol', 'sparse-zvol'; kept as it is when omitted and never changed) and 'volblocksize' (a zvol's block size, like '128k', applied only where the zvol is created). Disks can be added and grown; removing one from this list fails rather than throwing its data away"
     "nics","list of dicts","false","\-","\-","Network interfaces of the guest, in order. Sub-options: 'switch' (required), 'mac' (optional - if omitted the one vm-bhyve generated is kept) and 'type' (one of: 'virtio-net' (default), 'e1000')"
     "image","path","false","\-","\-","Path on the host to a prebuilt raw disk image. It seeds the first disk whenever that disk has no image file yet, and is ignored while the disk exists - so deleting the disk is what asks for the guest to be installed again"
     "running","boolean","false","\-","\-","Whether the guest should be running. Left as it is if omitted"
@@ -149,7 +149,37 @@ written to its disk - **deleting the disk file is the deliberate act** that asks
 for the guest to be installed again. Any further disks always start empty.
 
 The disk is grown to the declared size after seeding, so the image itself can
-stay small.
+stay small. A zvol is created at its declared size and the image written onto
+the volume's device, which comes to the same thing.
+
+Files or zvols
+==============
+
+A disk is backed either by a **file** in the guest's directory - the default -
+or by a **zvol** below the guest's own dataset, which needs a
+:code:`zfs:` datastore. The choice is per disk:
+
+.. code-block:: yaml
+
+    disks:
+      - size: '40G'
+        dev: 'zvol'
+      - size: '1T'
+        dev: 'zvol'
+        volblocksize: '128k'
+
+:code:`zvol` reserves its space up front, :code:`sparse-zvol` does not. A sparse
+volume lets the pool overcommit, and the guest then meets the shortfall as a
+write error inside a filesystem that believes it has room - so thick is the
+default shape of a zvol here, and sparse is something you ask for.
+
+:code:`volblocksize` only ever applies when the zvol is created, because zfs
+cannot change it afterwards. Declaring a different one later is silently
+inert - recreate the disk if you need to change it.
+
+The backing of an existing disk is **kept when omitted and refused when
+changed**: the data lives in the backing store, so swapping one for another is
+not a reconfiguration but a wipe.
 
 Disks only grow
 ===============
@@ -157,7 +187,7 @@ Disks only grow
 Disks are matched **by their position** in the list, and that list is
 append-and-grow-only:
 
-* a bigger :code:`size` sparse-extends the image file
+* a bigger :code:`size` sparse-extends the image file, or grows the zvol's :code:`volsize`
 * a smaller :code:`size` **fails** - it would truncate a filesystem the guest is using
 * dropping an entry **fails** - it would throw the data away
 

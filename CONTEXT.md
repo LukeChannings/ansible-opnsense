@@ -23,3 +23,7 @@ _Avoid_: ISO, installer, template
 
 **Datastore**:
 A vm-bhyve storage location for guests (e.g. `zfs:zroot/virtual-machines`). The default datastore is defined by `vm_dir`.
+
+**Backing store**:
+What a guest disk actually is on the host: a file in the guest's directory, or a zvol below the guest's dataset (thick, or sparse where the pool is allowed to overcommit). Chosen per disk with `dev`, never changed afterwards - the data lives in it.
+_Avoid_: disk type (`type` is how the disk is attached to the guest: virtio-blk, ahci-hd, nvme)

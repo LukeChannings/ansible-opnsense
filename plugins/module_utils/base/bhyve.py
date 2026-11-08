@@ -14,8 +14,12 @@ VM_CMD = '/usr/local/sbin/vm'
 STOP_POLL_INTERVAL = 2
 
 
-class BhyveHost:
+class BhyveHost:  # pylint: disable=R0904
     """Everything the bhyve modules do to the OPNsense host they run on.
+
+    Deliberately one class per host rather than several: it is the seam the
+    modules are tested behind, so a method count says nothing useful about it.
+
 
     Unlike the api-modules of this collection these run on the firewall itself
     (see ADR-0001), so the configuration files are read and written directly and
@@ -155,6 +159,63 @@ class BhyveHost:
             raise BhyveError(f"dataset '{location}' of the datastore does not exist")
 
         return stdout.strip()
+
+    # zvols
+
+    def zvol_dataset(self, guest: str, disk_name: str) -> str:
+        """The dataset of a guest's zvol, which vm-bhyve places below the guest's own."""
+        scheme, location = parse_datastore(self.vm_dir_spec())
+
+        if scheme != 'zfs':
+            raise BhyveError(
+                "a zvol-backed disk needs a zfs datastore - this host's is "
+                f"'{location}'. Point 'bhyve_general' at a dataset "
+                "('zfs:<pool>/<dataset>') or back the disk with a file"
+            )
+
+        return f'{location}/{guest}/{disk_name}'
+
+    @staticmethod
+    def zvol_device(dataset: str) -> str:
+        return f'/dev/zvol/{dataset}'
+
+    def zvol_size(self, dataset: str) -> int:
+        """The volsize of a zvol in bytes, or None where the zvol does not exist.
+
+        volsize rather than the device's own size: it is what 'zfs set' changes
+        and what a thick zvol reserves, so it is the number a declared size is
+        comparable with.
+        """
+        rc, stdout, _ = self.run(
+            ['zfs', 'get', '-Hp', '-o', 'value', 'volsize', dataset], check_rc=False
+        )
+
+        if rc != 0:
+            return None
+
+        return int(stdout.strip())
+
+    def zvol_create(self, dataset: str, size: int, sparse: bool, volblocksize: str) -> None:
+        """Creates a zvol for a guest disk.
+
+        Thick by default: a sparse zvol lets the pool overcommit and surfaces as
+        ENOSPC inside the guest's filesystem mid-write, which is a worse failure
+        than an honest refusal here.
+        """
+        self.run([
+            'zfs', 'create',
+            *(['-s'] if sparse else []),
+            *(['-o', f'volblocksize={volblocksize}'] if volblocksize else []),
+            '-V', str(size),
+            dataset,
+        ])
+
+    def zvol_grow(self, dataset: str, size: int) -> None:
+        self.run(['zfs', 'set', f'volsize={size}', dataset])
+
+    def write_device(self, source: str, device: str) -> None:
+        """Copies an image onto a device, which cannot simply be overwritten as a file."""
+        self.run(['dd', f'if={source}', f'of={device}', 'bs=1m', 'status=none'])
 
     def vm_dir_spec(self) -> str:
         """The specification of the default datastore, as configured in rc.conf.

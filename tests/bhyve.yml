@@ -389,6 +389,140 @@
       failed_when: guest_dir.stat.exists
       when: not ansible_check_mode
 
+    # A zvol-backed guest, where the datastore is a dataset. Everything below is
+    # skipped on a directory datastore, where zvols cannot exist at all.
+    - name: Reading the datastore specification
+      ansible.builtin.command:
+        cmd: 'sysrc -n vm_dir'
+      register: vm_dir_spec
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Testing zvol-backed disks
+      when:
+        - not ansible_check_mode
+        - vm_dir_spec.stdout is defined
+        - vm_dir_spec.stdout.startswith('zfs:')
+      vars:
+        zvol_guest: 'ansibletestzvolguest'
+        guest_dataset: "{{ vm_dir_spec.stdout | replace('zfs:', '') }}/ansibletestzvolguest"
+      block:
+        - name: Adding a guest backed by a zvol
+          oxlorg.opnsense.bhyve_guest:
+            name: "{{ zvol_guest }}"
+            cpu: 1
+            memory: '256M'
+            loader: 'uefi'
+            disks: [{size: '16M', dev: 'zvol', volblocksize: '16k'}]
+            nics: [{switch: "{{ test_switch }}"}]
+            image: "{{ test_image }}"
+          register: opn_zvol1
+          failed_when: >
+            opn_zvol1.failed or
+            not opn_zvol1.changed
+
+        - name: Adding a guest backed by a zvol - nothing changed
+          oxlorg.opnsense.bhyve_guest:
+            name: "{{ zvol_guest }}"
+            cpu: 1
+            memory: '256M'
+            loader: 'uefi'
+            disks: [{size: '16M', dev: 'zvol', volblocksize: '16k'}]
+            nics: [{switch: "{{ test_switch }}"}]
+            image: "{{ test_image }}"
+          register: opn_zvol2
+          failed_when: >
+            opn_zvol2.failed or
+            opn_zvol2.changed
+
+        - name: Reading the zvol guest configuration
+          ansible.builtin.slurp:
+            src: "{{ test_vm_dir }}/{{ zvol_guest }}/{{ zvol_guest }}.conf"
+          register: zvol_conf
+
+        - name: Checking the disk was written as a zvol
+          ansible.builtin.assert:
+            that:
+              - "'disk0_dev=\"zvol\"' in (zvol_conf.content | b64decode)"
+              - "'disk0_name=\"disk0\"' in (zvol_conf.content | b64decode)"
+
+        - name: Reading the zvol
+          ansible.builtin.command:
+            cmd: "zfs get -Hp -o value volsize,volblocksize {{ guest_dataset }}/disk0"
+          register: zvol_props
+          changed_when: false
+
+        - name: Checking the zvol was created as declared
+          ansible.builtin.assert:
+            that:
+              - zvol_props.stdout_lines == ['16777216', '16384']
+
+        - name: Reading the start of the zvol
+          ansible.builtin.command:
+            cmd: "head -c {{ test_magic | length }} /dev/zvol/{{ guest_dataset }}/disk0"
+          register: zvol_seeded
+          changed_when: false
+
+        - name: Checking the zvol was seeded from the image
+          ansible.builtin.assert:
+            that:
+              - zvol_seeded.stdout == test_magic
+
+        - name: Changing a zvol guest - failing because a zvol may not shrink
+          oxlorg.opnsense.bhyve_guest:
+            name: "{{ zvol_guest }}"
+            disks: [{size: '8M'}]
+          register: opn_zvol_fail1
+          failed_when: not opn_zvol_fail1.failed
+
+        - name: Changing a zvol guest - failing because the backing may not change
+          oxlorg.opnsense.bhyve_guest:
+            name: "{{ zvol_guest }}"
+            disks: [{size: '16M', dev: 'file'}]
+          register: opn_zvol_fail2
+          failed_when: not opn_zvol_fail2.failed
+
+        - name: Changing a zvol guest - growing its zvol
+          oxlorg.opnsense.bhyve_guest:
+            name: "{{ zvol_guest }}"
+            disks: [{size: '32M'}]
+          register: opn_zvol3
+          failed_when: >
+            opn_zvol3.failed or
+            not opn_zvol3.changed
+
+        - name: Reading the grown zvol
+          ansible.builtin.command:
+            cmd: "zfs get -Hp -o value volsize {{ guest_dataset }}/disk0"
+          register: zvol_grown
+          changed_when: false
+
+        - name: Checking the zvol grew without being told what backs it
+          ansible.builtin.assert:
+            that:
+              - zvol_grown.stdout == '33554432'
+
+        - name: Removing the zvol guest
+          oxlorg.opnsense.bhyve_guest:
+            name: "{{ zvol_guest }}"
+            state: 'absent'
+          register: opn_zvol4
+          failed_when: >
+            opn_zvol4.failed or
+            not opn_zvol4.changed
+
+        - name: Looking for the guest dataset
+          ansible.builtin.command:
+            cmd: "zfs list -H -o name {{ guest_dataset }}"
+          register: zvol_dataset_left
+          changed_when: false
+          failed_when: false
+
+        - name: Checking the zvol went with the guest
+          ansible.builtin.assert:
+            that:
+              - zvol_dataset_left.rc != 0
+
     - name: Cleanup - removing the switch
       oxlorg.opnsense.bhyve_switch:
         name: "{{ test_switch }}"
