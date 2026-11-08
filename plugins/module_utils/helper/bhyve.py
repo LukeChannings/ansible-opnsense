@@ -210,6 +210,35 @@ def switch_bridge(system_conf: dict, name: str) -> str:
     return system_conf.get(f'bridge_{name}')
 
 
+def plan_running(
+        running_now: bool, running_wanted: bool, conf_changed: bool, restart_on_change: bool,
+) -> list:
+    """Decides how to get a guest into the declared running state.
+
+    A guest only ever restarts to pick up a new configuration when that was asked
+    for: a bhyve guest is a machine, and stopping one as a side effect of an
+    unrelated setting is rarely what anybody wants.
+    """
+    if running_wanted is False:
+        return ['stop'] if running_now else []
+
+    if not running_now:
+        return ['start'] if running_wanted else []
+
+    if conf_changed and restart_on_change:
+        return ['stop', 'start']
+
+    return []
+
+
+def clear_switch_bridge(system_conf: dict, name: str) -> dict:
+    """Drops the bridge setting 'vm switch destroy' leaves behind for a switch."""
+    return {
+        key: value for key, value in system_conf.items()
+        if key != f'bridge_{name}'
+    }
+
+
 def plan_switch(system_conf: dict, name: str, bridge: str, state: str) -> str:
     """Decides what has to happen to a switch: create, recreate, destroy or keep.
 
