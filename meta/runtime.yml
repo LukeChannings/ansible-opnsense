@@ -230,6 +230,13 @@ action_groups:
     - oxlorg.opnsense.tailscale_subnet_multi
   netflow:
     - oxlorg.opnsense.netflow
+  # deliberately not part of the 'all' group: these modules run on the host over
+  # SSH rather than against the API (see ADR-0001), so they take none of the
+  # api-parameters that group carries defaults for
+  bhyve:
+    - oxlorg.opnsense.bhyve_general
+    - oxlorg.opnsense.bhyve_switch
+    - oxlorg.opnsense.bhyve_guest
   all:
     - metadata:
         extend_group:
