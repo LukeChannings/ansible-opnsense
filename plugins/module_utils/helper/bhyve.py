@@ -210,6 +210,26 @@ def switch_bridge(system_conf: dict, name: str) -> str:
     return system_conf.get(f'bridge_{name}')
 
 
+def plan_switch(system_conf: dict, name: str, bridge: str, state: str) -> str:
+    """Decides what has to happen to a switch: create, recreate, destroy or keep.
+
+    vm-bhyve offers no way to move a switch to another bridge, so a switch that
+    points at the wrong one is destroyed and created again.
+    """
+    exists = name in switch_names(system_conf)
+
+    if state == 'absent':
+        return 'destroy' if exists else 'keep'
+
+    if not exists:
+        return 'create'
+
+    if switch_bridge(system_conf, name) != bridge:
+        return 'recreate'
+
+    return 'keep'
+
+
 def plan_disks(conf: dict, disks: list, sizes: dict) -> list:
     """Works out what has to happen to the image files of the declared disks.
 

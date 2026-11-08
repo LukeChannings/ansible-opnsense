@@ -69,6 +69,16 @@ class BhyveHost:
 
         self.m.atomic_move(tmp_path, file_path)
 
+    # interfaces
+
+    def bridges(self) -> list:
+        """The bridge interfaces of the host, which switches attach to.
+
+        Bridges belong to OPNsense's own interface configuration - see the
+        'interface_bridge' module - so they are only ever read here.
+        """
+        return self.run(['ifconfig', '-g', 'bridge'])[1].split()
+
     # rc.conf
 
     def sysrc_get(self, key: str) -> str:

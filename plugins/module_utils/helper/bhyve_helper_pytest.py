@@ -3,7 +3,7 @@ from pytest import raises
 from ansible_collections.oxlorg.opnsense.plugins.module_utils.helper.bhyve import \
     parse_conf, render_conf, build_guest_conf, size_to_bytes, plan_disks, \
     switch_names, switch_bridge, conf_diff, apply_autostart, parse_datastore, \
-    is_valid_name, BhyveError
+    is_valid_name, plan_switch, BhyveError
 
 # the conf of the guest that exists on the development router
 GUEST_CONF_NIXOS = '''loader="grub"
@@ -226,6 +226,42 @@ def test_a_removed_switch_is_gone_even_though_its_bridge_setting_remains():
     left_behind = parse_conf('switch_list=""\nbridge_public="bridge0"\n')
 
     assert switch_names(left_behind) == []
+
+
+def test_a_switch_that_does_not_exist_yet_is_created():
+    assert plan_switch({}, name='lan', bridge='bridge0', state='present') == 'create'
+
+
+def test_a_switch_on_the_declared_bridge_is_left_alone():
+    assert plan_switch(
+        parse_conf(SYSTEM_CONF), name='public', bridge='bridge0', state='present',
+    ) == 'keep'
+
+
+def test_a_switch_pointing_at_another_bridge_is_rebuilt():
+    # vm-bhyve cannot re-point a switch, so it has to go and come back
+    assert plan_switch(
+        parse_conf(SYSTEM_CONF), name='public', bridge='bridge1', state='present',
+    ) == 'recreate'
+
+
+def test_an_unwanted_switch_is_destroyed():
+    assert plan_switch(
+        parse_conf(SYSTEM_CONF), name='public', bridge=None, state='absent',
+    ) == 'destroy'
+
+
+def test_a_switch_that_is_already_gone_is_left_alone():
+    assert plan_switch({}, name='public', bridge=None, state='absent') == 'keep'
+
+
+def test_a_switch_is_recreated_where_only_its_stale_bridge_setting_survived():
+    # the setting 'vm switch destroy' left behind must not look like a switch
+    left_behind = parse_conf('switch_list=""\nbridge_public="bridge0"\n')
+
+    assert plan_switch(
+        left_behind, name='public', bridge='bridge0', state='present',
+    ) == 'create'
 
 
 def test_a_disk_without_an_image_file_is_created():
