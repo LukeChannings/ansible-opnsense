@@ -1,0 +1,3 @@
+# Transient FreeBSD repo overlay for bhyve packages
+
+The OPNsense package repo does not carry vm-bhyve; the upstream FreeBSD-ports repo does, but OPNsense deliberately disables it (and re-disables it on upgrades) because persistently enabling it lets `pkg upgrade` pull FreeBSD builds over OPNsense's own packages. `bhyve_general` therefore installs missing bhyve packages by enabling the FreeBSD-ports repo **for that single pkg transaction only** (temporary `REPOS_DIR` overlay), leaving the system's repo configuration untouched. Packages are not `pkg lock`ed; if an OPNsense upgrade strips them, re-running `bhyve_general` re-converges.
