@@ -3,7 +3,7 @@ from pytest import raises
 from ansible_collections.oxlorg.opnsense.plugins.module_utils.helper.bhyve import \
     parse_conf, render_conf, build_guest_conf, size_to_bytes, plan_disks, \
     switch_names, switch_bridge, conf_diff, apply_autostart, parse_datastore, \
-    is_valid_name, plan_switch, BhyveError
+    is_valid_name, plan_switch, plan_running, clear_switch_bridge, BhyveError
 
 # the conf of the guest that exists on the development router
 GUEST_CONF_NIXOS = '''loader="grub"
@@ -226,6 +226,75 @@ def test_a_removed_switch_is_gone_even_though_its_bridge_setting_remains():
     left_behind = parse_conf('switch_list=""\nbridge_public="bridge0"\n')
 
     assert switch_names(left_behind) == []
+
+
+def test_a_stopped_guest_that_should_run_is_started():
+    assert plan_running(
+        running_now=False, running_wanted=True, conf_changed=False, restart_on_change=False,
+    ) == ['start']
+
+
+def test_a_running_guest_that_should_stop_is_stopped():
+    assert plan_running(
+        running_now=True, running_wanted=False, conf_changed=False, restart_on_change=False,
+    ) == ['stop']
+
+
+def test_a_guest_already_in_the_wanted_state_is_left_alone():
+    assert plan_running(
+        running_now=True, running_wanted=True, conf_changed=False, restart_on_change=False,
+    ) == []
+
+
+def test_an_undeclared_running_state_is_not_touched():
+    assert plan_running(
+        running_now=False, running_wanted=None, conf_changed=False, restart_on_change=False,
+    ) == []
+
+
+def test_reconfiguring_a_running_guest_does_not_restart_it_by_default():
+    # the conf is written either way; applying it must stay an explicit choice,
+    # so a routine run never interrupts a guest
+    assert plan_running(
+        running_now=True, running_wanted=None, conf_changed=True, restart_on_change=False,
+    ) == []
+
+
+def test_reconfiguring_a_running_guest_restarts_it_when_asked():
+    assert plan_running(
+        running_now=True, running_wanted=True, conf_changed=True, restart_on_change=True,
+    ) == ['stop', 'start']
+
+
+def test_a_guest_that_should_stop_is_not_restarted_for_a_conf_change():
+    assert plan_running(
+        running_now=True, running_wanted=False, conf_changed=True, restart_on_change=True,
+    ) == ['stop']
+
+
+def test_a_stopped_guest_needs_no_restart_to_pick_up_a_new_conf():
+    assert plan_running(
+        running_now=False, running_wanted=None, conf_changed=True, restart_on_change=True,
+    ) == []
+
+
+def test_removing_a_switch_takes_its_bridge_setting_with_it():
+    # 'vm switch destroy' leaves 'bridge_<name>' behind; we clear it so repeated
+    # runs do not pile up settings for switches that no longer exist
+    left_behind = parse_conf(
+        'switch_list=""\n'
+        'bridge_public="bridge0"\n'
+        'bridge_other="bridge1"\n'
+    )
+
+    assert clear_switch_bridge(left_behind, 'public') == {
+        'switch_list': '',
+        'bridge_other': 'bridge1',
+    }
+
+
+def test_clearing_a_switch_that_left_nothing_behind_changes_nothing():
+    assert clear_switch_bridge(parse_conf(SYSTEM_CONF), 'other') == parse_conf(SYSTEM_CONF)
 
 
 def test_a_switch_that_does_not_exist_yet_is_created():
