@@ -1,4 +1,4 @@
-from os import makedirs
+from os import geteuid, makedirs
 from os import path as os_path
 from os import stat as os_stat
 from shutil import copyfile
@@ -214,6 +214,12 @@ class BhyveModule:
 def bhyve_module_wrapper(instance: BhyveModule) -> None:
     """Runs a bhyve module, turning its failures into a failed task."""
     try:
+        if geteuid() != 0:
+            raise BhyveError(
+                'these modules configure the firewall itself and have to run as '
+                "root - add 'become: true' to the task or play"
+            )
+
         instance.check()
         instance.process()
 

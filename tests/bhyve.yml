@@ -3,7 +3,7 @@
 # Unlike the api-modules these run on the firewall itself (see ADR-0001), so this
 # playbook targets it over SSH instead of localhost.
 #
-#   TEST_SSH_HOST    inventory host of the firewall to test against
+#   TEST_SSH_HOST    inventory host of the firewall to test against ('opnsense')
 #   TEST_BHYVE_BRIDGE  existing bridge interface the test switch may attach to
 #   TEST_BHYVE_DIR   datastore directory, if not '/zroot/virtual-machines'
 #
@@ -11,7 +11,7 @@
 # end; existing guests and switches are left alone.
 
 - name: Testing bhyve
-  hosts: "{{ lookup('ansible.builtin.env', 'TEST_SSH_HOST') }}"
+  hosts: "{{ lookup('ansible.builtin.env', 'TEST_SSH_HOST') | default('opnsense', true) }}"
   gather_facts: no
   become: true
 
@@ -227,6 +227,96 @@
         that:
           - "'network0_switch=\"' + test_switch + '\"' in (guest_conf2.content | b64decode)"
           - "'disk0_name=\"disk0.img\"' in (guest_conf2.content | b64decode)"
+      when: not ansible_check_mode
+
+    - name: Starting a guest
+      oxlorg.opnsense.bhyve_guest:
+        name: "{{ test_guest }}"
+        running: true
+      register: opn_run1
+      failed_when: >
+        opn_run1.failed or
+        not opn_run1.changed
+      when: not ansible_check_mode
+
+    - name: Checking the guest is running
+      ansible.builtin.stat:
+        path: "/dev/vmm/{{ test_guest }}"
+      register: vmm1
+      failed_when: not vmm1.stat.exists
+      when: not ansible_check_mode
+
+    - name: Starting a guest - nothing changed
+      oxlorg.opnsense.bhyve_guest:
+        name: "{{ test_guest }}"
+        running: true
+      register: opn_run2
+      failed_when: >
+        opn_run2.failed or
+        opn_run2.changed
+      when: not ansible_check_mode
+
+    - name: Reconfiguring a running guest - written, but not applied yet
+      oxlorg.opnsense.bhyve_guest:
+        name: "{{ test_guest }}"
+        memory: '320M'
+      register: opn_run3
+      failed_when: >
+        opn_run3.failed or
+        not opn_run3.changed
+      when: not ansible_check_mode
+
+    - name: Checking the guest was left running
+      ansible.builtin.stat:
+        path: "/dev/vmm/{{ test_guest }}"
+      register: vmm2
+      failed_when: not vmm2.stat.exists
+      when: not ansible_check_mode
+
+    - name: Reconfiguring a running guest - applied on request
+      oxlorg.opnsense.bhyve_guest:
+        name: "{{ test_guest }}"
+        memory: '384M'
+        restart_on_change: true
+      register: opn_run4
+      failed_when: >
+        opn_run4.failed or
+        not opn_run4.changed
+      when: not ansible_check_mode
+
+    - name: Checking the guest came back up
+      ansible.builtin.stat:
+        path: "/dev/vmm/{{ test_guest }}"
+      register: vmm3
+      failed_when: not vmm3.stat.exists
+      when: not ansible_check_mode
+
+    - name: Stopping a guest
+      oxlorg.opnsense.bhyve_guest:
+        name: "{{ test_guest }}"
+        running: false
+        stop_timeout: 30
+      register: opn_run5
+      failed_when: >
+        opn_run5.failed or
+        not opn_run5.changed
+      when: not ansible_check_mode
+
+    - name: Checking the guest is stopped
+      ansible.builtin.stat:
+        path: "/dev/vmm/{{ test_guest }}"
+      register: vmm4
+      failed_when: vmm4.stat.exists
+      when: not ansible_check_mode
+
+    - name: Stopping a guest - nothing changed
+      oxlorg.opnsense.bhyve_guest:
+        name: "{{ test_guest }}"
+        running: false
+      register: opn_run6
+      failed_when: >
+        opn_run6.failed or
+        opn_run6.changed
       when: not ansible_check_mode
 
     - name: Changing a guest - autostarting it
