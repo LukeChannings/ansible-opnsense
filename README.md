@@ -271,6 +271,11 @@ not implemented => development => [testing](https://github.com/O-X-L/ansible-opn
 | **Tailscale**             | oxlorg.opnsense.tailscale_subnet                               | [Docs](https://ansible-opnsense.oxl.app/modules/tailscale.html)                                                 | unstable |
 | **Tailscale**             | oxlorg.opnsense.tailscale_subnet_multi                         | [Docs](https://ansible-opnsense.oxl.app/modules/tailscale.html#oxlorg-opnsense-tailscale-subnet-multi)          | unstable |
 | **NetFlow**               | oxlorg.opnsense.netflow                                        | [Docs](https://ansible-opnsense.oxl.app/modules/netflow.html)                                                   | unstable |
+| **bhyve**                 | oxlorg.opnsense.bhyve_general                                  | [Docs](https://ansible-opnsense.oxl.app/modules/bhyve.html)                                                     | unstable |
+| **bhyve**                 | oxlorg.opnsense.bhyve_switch                                   | [Docs](https://ansible-opnsense.oxl.app/modules/bhyve.html)                                                     | unstable |
+| **bhyve**                 | oxlorg.opnsense.bhyve_guest                                    | [Docs](https://ansible-opnsense.oxl.app/modules/bhyve.html)                                                     | unstable |
+
+The `bhyve_*` modules are the exception to the rule above: they have no OPNsense API to talk to, so they run on the firewall over SSH instead of from the control node. See [their docs](https://ansible-opnsense.oxl.app/modules/bhyve.html).
 
 ### Roadmap
 
