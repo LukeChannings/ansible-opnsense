@@ -44,6 +44,7 @@ def run_module():
                 'interface_vxlan',
                 'interface_vip',
                 'interface_lagg',
+                'interface_bridge',
                 'frr',
                 'webproxy',
                 'bind',
@@ -152,6 +153,10 @@ def run_module():
         elif target == 'interface_lagg':
             from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.interface_lagg import \
                 Lagg as Target_Obj
+
+        elif target == 'interface_bridge':
+            from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.interface_bridge import \
+                Bridge as Target_Obj
 
         elif target == 'frr':
             from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.frr_bgp_general import \

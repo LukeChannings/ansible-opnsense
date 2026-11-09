@@ -35,6 +35,7 @@
         - 'interface_vxlan'
         - 'interface_vip'
         - 'interface_lagg'
+        - 'interface_bridge'
         - 'frr'
         - 'webproxy'
         - 'bind'
