@@ -8,6 +8,34 @@ from ansible_collections.oxlorg.opnsense.plugins.module_utils.base.module import
 from ansible_collections.oxlorg.opnsense.plugins.module_utils.helper.translate import \
     get_selected
 
+def find_assignment(existing: list, identifier: str, device: str) -> (dict, None):
+    """Picks the existing assignment a declaration is about.
+
+    An identifier names exactly one assignment and OPNsense never reuses it, so
+    when one is given it decides the match on its own. Falling back to the
+    device here would be actively wrong: a device belongs to whichever
+    assignment holds it TODAY, and the one moment someone declares an
+    identifier that does not exist yet is the moment they are moving a device
+    off another interface -- which would then be adopted and rewritten, lock
+    and description and all, instead of a new interface being created.
+
+    Without an identifier the device is all there is to go on, which is how an
+    existing table is adopted without naming every identifier by hand.
+    """
+    if not is_unset(identifier):
+        for assignment in existing:
+            if assignment['identifier'] == identifier:
+                return assignment
+
+        return None
+
+    for assignment in existing:
+        if get_selected(assignment.get('device', {})) == device:
+            return assignment
+
+    return None
+
+
 class Assignment(BaseModule):
     FIELD_ID = 'identifier'
     CMDS = {
@@ -50,15 +78,16 @@ class Assignment(BaseModule):
         self.assignment = {}
 
     def _find_device(self) -> None:
-        for assignment in self.get_existing():
-            device = get_selected(assignment.get('device', {}))
+        match = find_assignment(
+            existing=self.get_existing(),
+            identifier=self.p['identifier'],
+            device=self.p['device'],
+        )
 
-            # device and id both are unique
-            if device == self.p['device'] or assignment['identifier'] == self.p['identifier']:
-                self.exists = True
-                self.e = assignment
-                self.p['identifier'] = assignment['identifier']
-                return
+        if match is not None:
+            self.exists = True
+            self.e = match
+            self.p['identifier'] = match['identifier']
 
     def check(self) -> None:
         self._find_device()
