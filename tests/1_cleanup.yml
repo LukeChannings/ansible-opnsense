@@ -1325,3 +1325,15 @@
         - 52
         - 53
         - 61
+
+    - name: Cleanup Tailscale Subnets
+      oxlorg.opnsense.tailscale_subnet:
+        subnet: "{{ item }}"
+        state: 'absent'
+      loop:
+        - '192.168.69.0/24'
+        - 'fd00:69::/64'
+        - '192.168.71.0/24'
+        - '192.168.72.0/24'
+        - '192.168.73.0/24'
+        - 'fd00:71::/64'

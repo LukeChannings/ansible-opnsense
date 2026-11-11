@@ -267,6 +267,9 @@ not implemented => development => [testing](https://github.com/O-X-L/ansible-opn
 | **UDP Broadcast Relay**   | oxlorg.opnsense.udpbroadcastrelay_multi                        | [Docs](https://ansible-opnsense.oxl.app/modules/udpbroadcastrelay.html#oxlorg-opnsense-udpbroadcastrelay-multi) | unstable |
 | **Node Exporter**         | oxlorg.opnsense.nodeexporter                                   | [Docs](https://ansible-opnsense.oxl.app/modules/nodeexporter.html)                                              | unstable |
 | **CrowdSec**              | oxlorg.opnsense.crowdsec_general                               | [Docs](https://ansible-opnsense.oxl.app/modules/crowdsec.html)                                                  | unstable |
+| **Tailscale**             | oxlorg.opnsense.tailscale_general                              | [Docs](https://ansible-opnsense.oxl.app/modules/tailscale.html)                                                 | unstable |
+| **Tailscale**             | oxlorg.opnsense.tailscale_subnet                               | [Docs](https://ansible-opnsense.oxl.app/modules/tailscale.html)                                                 | unstable |
+| **Tailscale**             | oxlorg.opnsense.tailscale_subnet_multi                         | [Docs](https://ansible-opnsense.oxl.app/modules/tailscale.html#oxlorg-opnsense-tailscale-subnet-multi)          | unstable |
 
 ### Roadmap
 
