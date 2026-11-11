@@ -60,6 +60,7 @@ def run_module():
                 'nut',
                 'interface_assignment',
                 'radvd',
+                'udpbroadcastrelay',
             ],
             description='What part of the running config should be reloaded'
         ),
@@ -211,6 +212,10 @@ def run_module():
         elif target == 'radvd':
             from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.radvd import \
                 Radvd as Target_Obj
+
+        elif target == 'udpbroadcastrelay':
+            from ansible_collections.oxlorg.opnsense.plugins.module_utils.main.udpbroadcastrelay import \
+                Relay as Target_Obj
 
     except MODULE_EXCEPTIONS:
         module_dependency_error()

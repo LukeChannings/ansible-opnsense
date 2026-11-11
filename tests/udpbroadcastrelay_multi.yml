@@ -1,0 +1,201 @@
+---
+
+- name: Testing Multiple UDP Broadcast Relays
+  hosts: localhost
+  gather_facts: no
+  module_defaults:
+    group/oxlorg.opnsense.all:
+      firewall: "{{ lookup('ansible.builtin.env', 'TEST_FIREWALL') }}"
+      api_credential_file: "{{ lookup('ansible.builtin.env', 'TEST_API_KEY') }}"
+      ssl_verify: false
+
+    oxlorg.opnsense.list:
+      target: 'udpbroadcastrelay'
+
+    oxlorg.opnsense.udpbroadcastrelay_multi:
+      match_fields: ['instance_id']
+      multi_control:
+        fail_verify: true
+        fail_process: true
+
+  vars:
+    if1: "{{ lookup('ansible.builtin.env', 'TEST_UBR_IF1') | default('lan', true) }}"
+    if2: "{{ lookup('ansible.builtin.env', 'TEST_UBR_IF2') | default('wan', true) }}"
+
+  environment:
+    HTTPS_PROXY: "{{ lookup('ansible.builtin.env', 'TEST_PROXY') | default('') }}"
+
+  tasks:
+    - name: Removing - do not exist
+      oxlorg.opnsense.udpbroadcastrelay_multi:
+        relays:
+          - instance_id: 51
+          - instance_id: 52
+          - instance_id: 53
+        multi_control:
+          state: 'absent'
+      register: opn1
+      failed_when: >
+        opn1.failed or
+        opn1.changed
+
+    - name: Adding - failing because only one interface was provided
+      oxlorg.opnsense.udpbroadcastrelay_multi:
+        relays:
+          - instance_id: 51
+            listen_port: 19051
+            interfaces: ['{{ if1 }}']
+      register: opn_fail1
+      failed_when: not opn_fail1.failed
+
+    - name: Adding - failing because of an invalid multicast-address
+      oxlorg.opnsense.udpbroadcastrelay_multi:
+        relays:
+          - instance_id: 51
+            listen_port: 19051
+            interfaces: ['{{ if1 }}', '{{ if2 }}']
+            multicast_address: ['fe80::1']
+      register: opn_fail2
+      failed_when: not opn_fail2.failed
+
+    - name: Adding
+      oxlorg.opnsense.udpbroadcastrelay_multi:
+        relays:
+          - instance_id: 51
+            listen_port: 19051
+            interfaces: ['{{ if1 }}', '{{ if2 }}']
+            description: 'ANSIBLE_TEST_1_1'
+          - instance_id: 52
+            listen_port: 19052
+            interfaces: ['{{ if1 }}', '{{ if2 }}']
+            multicast_address: ['239.255.255.250']
+            description: 'ANSIBLE_TEST_1_2'
+          - instance_id: 53
+            listen_port: 19053
+            interfaces: ['{{ if1 }}', '{{ if2 }}']
+            revert_ttl: true
+            description: 'ANSIBLE_TEST_1_3'
+      register: opn2
+      failed_when: >
+        opn2.failed or
+        not opn2.changed
+
+    - name: Adding - nothing should change
+      oxlorg.opnsense.udpbroadcastrelay_multi:
+        relays:
+          - instance_id: 51
+            listen_port: 19051
+            interfaces: ['{{ if1 }}', '{{ if2 }}']
+            description: 'ANSIBLE_TEST_1_1'
+          - instance_id: 52
+            listen_port: 19052
+            interfaces: ['{{ if1 }}', '{{ if2 }}']
+            multicast_address: ['239.255.255.250']
+            description: 'ANSIBLE_TEST_1_2'
+          - instance_id: 53
+            listen_port: 19053
+            interfaces: ['{{ if1 }}', '{{ if2 }}']
+            revert_ttl: true
+            description: 'ANSIBLE_TEST_1_3'
+      register: opn3
+      failed_when: >
+        opn3.failed or
+        opn3.changed
+
+    - name: Changing
+      oxlorg.opnsense.udpbroadcastrelay_multi:
+        relays:
+          - instance_id: 51
+            listen_port: 19151
+            interfaces: ['{{ if1 }}', '{{ if2 }}']
+            description: 'ANSIBLE_TEST_1_1'
+          - instance_id: 52
+            listen_port: 19052
+            interfaces: ['{{ if1 }}', '{{ if2 }}']
+            multicast_address: ['239.255.255.251']
+            description: 'ANSIBLE_TEST_1_2'
+          - instance_id: 53
+            listen_port: 19053
+            interfaces: ['{{ if1 }}', '{{ if2 }}']
+            revert_ttl: false
+            description: 'ANSIBLE_TEST_1_3'
+      register: opn4
+      failed_when: >
+        opn4.failed or
+        not opn4.changed
+
+    - name: Disabling using the overrides
+      oxlorg.opnsense.udpbroadcastrelay_multi:
+        relays:
+          - instance_id: 51
+            listen_port: 19151
+            interfaces: ['{{ if1 }}', '{{ if2 }}']
+            description: 'ANSIBLE_TEST_1_1'
+          - instance_id: 52
+            listen_port: 19052
+            interfaces: ['{{ if1 }}', '{{ if2 }}']
+            multicast_address: ['239.255.255.251']
+            description: 'ANSIBLE_TEST_1_2'
+        multi_control:
+          enabled: false
+      register: opn5
+      failed_when: >
+        opn5.failed or
+        not opn5.changed
+
+    - name: Listing
+      oxlorg.opnsense.list:
+      register: opn6
+      failed_when: >
+        'data' not in opn6 or
+        opn6.data | length < 3
+
+    - name: Purging the ones not configured
+      oxlorg.opnsense.udpbroadcastrelay_multi:
+        relays:
+          - instance_id: 51
+            listen_port: 19151
+            interfaces: ['{{ if1 }}', '{{ if2 }}']
+            description: 'ANSIBLE_TEST_1_1'
+            enabled: false
+          - instance_id: 52
+            listen_port: 19052
+            interfaces: ['{{ if1 }}', '{{ if2 }}']
+            multicast_address: ['239.255.255.251']
+            description: 'ANSIBLE_TEST_1_2'
+            enabled: false
+        multi_control:
+          purge_unconfigured: true
+          purge_filter:
+            description: 'ANSIBLE_TEST_1_'
+          purge_filter_partial: true
+      register: opn7
+      failed_when: >
+        opn7.failed or
+        not opn7.changed
+
+    - name: Purging the rest
+      oxlorg.opnsense.udpbroadcastrelay_multi:
+        relays_purge:
+          - instance_id: 51
+          - instance_id: 52
+      register: opn8
+      failed_when: >
+        opn8.failed or
+        not opn8.changed
+
+    - name: Purging the rest - nothing should change
+      oxlorg.opnsense.udpbroadcastrelay_multi:
+        relays_purge:
+          - instance_id: 51
+          - instance_id: 52
+      register: opn9
+      failed_when: >
+        opn9.failed or
+        opn9.changed
+
+    - name: Cleanup
+      oxlorg.opnsense.udpbroadcastrelay:
+        instance_id: "{{ item }}"
+        state: 'absent'
+      loop: [51, 52, 53]
