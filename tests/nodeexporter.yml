@@ -1,0 +1,111 @@
+---
+- name: Testing Node Exporter
+  hosts: localhost
+  gather_facts: no
+  module_defaults:
+    group/oxlorg.opnsense.all:
+      firewall: "{{ lookup('ansible.builtin.env', 'TEST_FIREWALL') }}"
+      api_credential_file: "{{ lookup('ansible.builtin.env', 'TEST_API_KEY') }}"
+      ssl_verify: false
+
+    oxlorg.opnsense.list:
+      target: 'nodeexporter'
+
+  environment:
+    HTTPS_PROXY: "{{ lookup('ansible.builtin.env', 'TEST_PROXY') | default('') }}"
+
+  tasks:
+    - name: Listing
+      oxlorg.opnsense.list:
+      register: opn_pre1
+      failed_when: >
+        opn_pre1.failed or
+        'data' not in opn_pre1 or
+        opn_pre1.data | length == 0
+
+    - name: Configuring - failing because of an invalid listen-address
+      oxlorg.opnsense.nodeexporter:
+        listen_address: 'not-an-ip'
+      register: opn_fail1
+      failed_when: not opn_fail1.failed
+
+    - name: Configuring - failing because of an invalid listen-port
+      oxlorg.opnsense.nodeexporter:
+        listen_port: 65536
+      register: opn_fail2
+      failed_when: not opn_fail2.failed
+
+    - name: Configuring - default collectors on a non-default socket
+      oxlorg.opnsense.nodeexporter:
+        enabled: true
+        listen_address: '127.0.0.1'
+        listen_port: 19100
+      register: opn1
+      failed_when: >
+        opn1.failed or
+        not opn1.changed
+
+    - name: Configuring - nothing changed
+      oxlorg.opnsense.nodeexporter:
+        enabled: true
+        listen_address: '127.0.0.1'
+        listen_port: 19100
+      register: opn2
+      failed_when: >
+        opn2.failed or
+        opn2.changed
+      when: not ansible_check_mode
+
+    - name: Listing - the default collectors were written
+      oxlorg.opnsense.list:
+      register: opn3
+      failed_when: >
+        opn3.failed or
+        opn3.data.listen_address != '127.0.0.1' or
+        opn3.data.listen_port != 19100 or
+        opn3.data.cpu is not true or
+        opn3.data.netdev is not true or
+        opn3.data.zfs is not true or
+        opn3.data.devstat is not false or
+        opn3.data.ntp is not false
+      when: not ansible_check_mode
+
+    - name: Configuring - listening on an IPv6-address
+      oxlorg.opnsense.nodeexporter:
+        listen_address: '::1'
+        listen_port: 19100
+      register: opn4
+      failed_when: >
+        opn4.failed or
+        not opn4.changed
+      when: not ansible_check_mode
+
+    - name: Configuring - opting into devstat and ntp, opting out of cpu and netdev
+      oxlorg.opnsense.nodeexporter:
+        devstat: true
+        ntp: true
+        cpu: false
+        netdev: false
+      register: opn5
+      failed_when: >
+        opn5.failed or
+        not opn5.changed
+      when: not ansible_check_mode
+
+    - name: Listing - omitted fields fell back to their defaults
+      oxlorg.opnsense.list:
+      register: opn6
+      failed_when: >
+        opn6.failed or
+        opn6.data.listen_address != '0.0.0.0' or
+        opn6.data.listen_port != 9100 or
+        opn6.data.devstat is not true or
+        opn6.data.ntp is not true or
+        opn6.data.cpu is not false or
+        opn6.data.netdev is not false or
+        opn6.data.meminfo is not true
+      when: not ansible_check_mode
+
+    - name: Cleanup
+      oxlorg.opnsense.nodeexporter:
+        enabled: false

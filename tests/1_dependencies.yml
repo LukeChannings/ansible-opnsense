@@ -35,3 +35,4 @@
         - 'os-wazuh-agent'
         - 'os-nut'
         - 'os-udpbroadcastrelay'
+        - 'os-node_exporter'
