@@ -222,6 +222,8 @@ action_groups:
     - oxlorg.opnsense.udpbroadcastrelay_multi
   nodeexporter:
     - oxlorg.opnsense.nodeexporter
+  crowdsec:
+    - oxlorg.opnsense.crowdsec_general
   all:
     - metadata:
         extend_group:
@@ -259,6 +261,7 @@ action_groups:
           - oxlorg.opnsense.trust
           - oxlorg.opnsense.udpbroadcastrelay
           - oxlorg.opnsense.nodeexporter
+          - oxlorg.opnsense.crowdsec
 
 plugin_routing:
   modules:
